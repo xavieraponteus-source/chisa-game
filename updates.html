@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1020">
+<meta name="description" content="Explore the Version 1.6 update preview for Chisa Moonlight Flight! See the compact welcome screen, magical abilities, updated controls, and online rankings.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Chisa Moonlight Flight! - Version 1.6 Update">
+<meta property="og:description" content="A magical moonlit flight with new Sakura-themed controls, illustrated power guides, and online rankings.">
+<meta property="og:image" content="https://xavieraponteus-source.github.io/chisa-game/assets/site-nov26/home.webp">
+<meta property="og:url" content="https://xavieraponteus-source.github.io/chisa-game/updates.html">
+<title>Version 1.6 Update | Chisa Moonlight Flight!</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+:root{--glow:#edbdeb;--line:#ffffff28}
+*{box-sizing:border-box}
+body{overflow-x:hidden;background:radial-gradient(ellipse at 78% 5%,#39214150,transparent 50%),#0b1020}
+.wrap{max-width:1120px;margin:auto;padding:0 23px}
+.top{z-index:30;position:sticky;top:0;background:#0b1020ee;border-bottom:1px solid #ffffff24;backdrop-filter:blur(12px)}
+.top-inner{min-height:70px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.logo{font:700 17px/1.25 Georgia,serif;letter-spacing:.5px;text-decoration:none;color:#f8dfb1}
+.logo small{display:block;color:#e1b7da;font:600 9px/1.5 system-ui,sans-serif;letter-spacing:2.5px;text-transform:uppercase}
+.menu{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.menu a{font-size:12px;text-decoration:none;color:#f5e9ee;padding:9px 12px;border-radius:20px}
+.menu a:hover,.menu a:focus-visible{background:#ffffff17}
+.menu .store{color:#171327;background:#f3d59e;font-weight:800}
+.hero-v16{min-height:580px;position:relative;display:flex;align-items:center;isolation:isolate;overflow:hidden;border-bottom:1px solid #ffffff20}
+.hero-v16>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:72% center;z-index:-2}
+.hero-v16:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#0b1020f5 0%,#0b1020d8 43%,#0b10206b 77%,#0b102017),linear-gradient(0deg,#0b1020 0%,transparent 30%);z-index:-1}
+.hero-inner{width:100%;padding:85px 23px}
+.hero-v16 h1{font-size:clamp(43px,6vw,79px);max-width:720px;margin:15px 0 14px}
+.hero-v16 .lead{max-width:550px;color:#f5eaf2;font-size:17px;line-height:1.8}
+.kicker{color:#f3c4de;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase}
+.pill{display:inline-block;border:1px solid #f4dbb17a;border-radius:999px;background:#1e172bd4;color:#f5daa1;padding:5px 13px;font-size:11px;letter-spacing:1px;margin-top:13px}
+.ctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:27px}
+.ctas a{font-weight:750;font-size:13px;text-decoration:none;border-radius:9px;padding:13px 20px;display:inline-flex;align-items:center;justify-content:center;min-height:46px}
+.ctas .main{background:#f2d398;color:#21152c}
+.ctas .alt{border:1px solid #f3dae688;background:#171629b8;color:#fff1f5}
+.content-section{padding:73px 0}
+.content-section h2{font-size:clamp(30px,3.6vw,48px);margin:13px 0 12px}
+.section-desc{max-width:720px;color:#c6bed4;margin-bottom:35px}
+.release{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.release article{padding:22px 24px;border:1px solid #ffffff24;border-radius:14px;background:linear-gradient(125deg,#2c203bba,#121b2df0);min-height:158px}
+.release .num{display:block;color:#f8b7de;font-size:11px;font-weight:800;letter-spacing:2px;margin-bottom:13px}
+.release h3{font-size:23px;margin:0 0 10px}
+.release p{color:#cfc5d9;font-size:14px;line-height:1.65;margin:0}
+.power-section{background:linear-gradient(180deg,#121226,#0d1425);border-top:1px solid #ffffff20;border-bottom:1px solid #ffffff20}
+.powers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.power{display:flex;gap:14px;align-items:center;min-height:130px;border:1px solid #ffffff22;border-radius:15px;padding:17px;background:linear-gradient(140deg,#30213d,#171b30)}
+.power img{width:76px;height:76px;object-fit:contain;flex:none;filter:drop-shadow(0 0 12px #bd83e477)}
+.power h3{font-size:18px;margin:0 0 6px}
+.power p{margin:0;color:#cfc5d9;font-size:12px;line-height:1.55}
+.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;border:0}
+.control{border-left:2px solid #f7dbaa;padding:8px 20px;background:linear-gradient(90deg,#f7dbaa0a,transparent)}
+.control b{display:block;color:#f9e8c6;margin-bottom:8px}
+.control p{font-size:13px;color:#c4bed3;margin:0}
+.banner{display:grid;grid-template-columns:1.2fr 1fr;gap:30px;align-items:center;background:#1a1830;border:1px solid #e3b3d633;border-radius:22px;overflow:hidden}
+.banner img{width:100%;height:100%;min-height:290px;max-height:460px;object-fit:cover}
+.banner-copy{padding:30px 30px 30px 0}
+.banner-copy p{color:#d5cadc}
+.bottom{border-top:1px solid #ffffff22;background:#090d18;padding:31px 0;color:#aaa3b6;font-size:12px}
+.bottom .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.bottom a{color:#e4ceac;text-decoration:none;margin-right:18px}
+.notice{margin-top:22px;font-size:12px;color:#afa7c1}
+@media(max-width:780px){.hero-v16{min-height:690px;align-items:flex-end}.hero-v16>img{height:75%;object-position:67% top}.hero-v16:before{background:linear-gradient(0deg,#0b1020 9%,#0b1020f5 29%,#0b10208f 58%,transparent 88%)}.hero-inner{padding:320px 23px 65px}.powers{grid-template-columns:repeat(2,minmax(0,1fr))}.controls{grid-template-columns:1fr 1fr}.banner{grid-template-columns:1fr}.banner img{max-height:260px}.banner-copy{padding:0 25px 28px}}
+@media(max-width:550px){.top-inner{min-height:68px}.menu{gap:0}.menu a{font-size:11px;padding:7px 8px}.menu a:first-child{display:none}.logo{font-size:14px}.logo small{font-size:8px}.hero-v16 h1{font-size:42px}.hero-v16 .lead{font-size:15px}.release,.powers,.controls{grid-template-columns:1fr}.content-section{padding:55px 0}.power{min-height:105px}.power img{width:70px;height:70px}.ctas a{flex:1 1 100%}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap top-inner">
+<a href="https://xavier-is-working.com/" class="logo">CHISA <small>Moonlight Flight!</small></a>
+<nav class="menu" aria-label="Main navigation">
+<a href="#new">What's New</a><a href="#powers">Abilities</a>
+<a href="https://xavier-is-working.com/leaderboard.html">Rankings</a>
+<a class="store" href="https://apps.apple.com/app/id6825587415" rel="noopener noreferrer">App Store</a>
+</nav></div></header>
+<main id="main">
+<section class="hero-v16" aria-labelledby="hero-title">
+<img src="assets/site-nov26/home.webp" alt="Moonlit Japanese fantasy artwork for Chisa Moonlight Flight!" fetchpriority="high">
+<div class="wrap hero-inner"><p class="kicker">Chisa Moonlight Flight!</p><h1 id="hero-title">A magical flight just got better.</h1>
+<p class="lead">Fly through a moonlit world, dodge dangerous gates, discover magical powers, transform into a Kitsune, and chase your best score.</p>
+<span class="pill">Version 1.6 - Build 35 update preview</span>
+<div class="ctas"><a class="main" href="https://apps.apple.com/app/id6825587415">Get the Game on the App Store</a><a class="alt" href="#new">Explore the Update</a></div>
+<p class="notice">Preview of changes in the development build. App Store availability depends on publication of the new version.</p>
+</div></section>
+<section id="new" class="content-section wrap">
+<p class="kicker">Latest Development Update</p><h2>What's new in Version 1.6</h2>
+<p class="section-desc">The latest update refreshes the way your adventure begins while keeping the same magical flight experience.</p>
+<div class="release">
+<article><span class="num">01 / WELCOME</span><h3>Cleaner Get Ready screen</h3><p>The original Get Ready artwork is back at full size. A more compact welcome panel displays the essentials without an extra scroll.</p></article>
+<article><span class="num">02 / CONTROLS</span><h3>Clear Sakura-style buttons</h3><p>The artwork stays, and each top control now has a name underneath: Power, Support, Ranks, Sound, and Pause.</p></article>
+<article><span class="num">03 / ABILITIES</span><h3>Real power previews</h3><p>Six illustrated ability previews use their matching in-game pictures, with short descriptions to help players get started.</p></article>
+<article><span class="num">04 / COMPETE</span><h3>Online rankings</h3><p>Choose to share scores online, compare with friends by Chisa code, or enjoy the game offline with a personal best.</p></article>
+</div></section>
+<section class="content-section power-section" id="powers"><div class="wrap">
+<p class="kicker">The Magic of Flight</p><h2>Know your powers</h2>
+<p class="section-desc">Every picture below matches the ability artwork used in the game. Pick up a charm during your flight to activate its power.</p>
+<div class="powers">
+<div class="power"><img src="assets/shield.webp" loading="lazy" alt="Spirit Shield pickup"><div><h3>Spirit Shield</h3><p>Protects from one pillar hit for a limited time.</p></div></div>
+<div class="power"><img src="assets/time.webp" loading="lazy" alt="Time Vortex pickup"><div><h3>Time Vortex</h3><p>Slows the world so you have more time to react.</p></div></div>
+<div class="power"><img src="assets/double.webp" loading="lazy" alt="Double Points pickup"><div><h3>Double Points</h3><p>Earn twice the points, including Perfect bonuses.</p></div></div>
+<div class="power"><img src="assets/echo.webp" loading="lazy" alt="Echo Darkness pickup"><div><h3>Echo Darkness</h3><p>Reveal dark surroundings with pulses of red light.</p></div></div>
+<div class="power"><img src="assets/mirror.webp" loading="lazy" alt="Mirror World pickup"><div><h3>Mirror World</h3><p>Flight reverses. Swipe left to dash while mirrored.</p></div></div>
+<div class="power"><img src="assets/kitsune.webp" loading="lazy" alt="Kitsune Awakening pickup"><div><h3>Kitsune Awakening</h3><p>A rare fox transformation with fire and a huge score boost.</p></div></div>
+</div></div></section>
+<section class="content-section wrap" id="how-to-play">
+<p class="kicker">Quick Guide</p><h2>Easy to learn. Hard to master.</h2>
+<div class="controls">
+<div class="control"><b>Tap to fly</b><p>Time each tap to move through the gates.</p></div>
+<div class="control"><b>Swipe to dash</b><p>Make a deliberate long forward swipe. Dash charges automatically.</p></div>
+<div class="control"><b>Get close, then rewind</b><p>Earn rewind charge from close calls. Use it after a mistake.</p></div>
+</div></section>
+<section class="content-section wrap"><div class="banner">
+<img src="assets/site-nov26/rankings.webp" loading="lazy" alt="Moonlit rankings artwork">
+<div class="banner-copy"><p class="kicker">Challenge the Sky</p><h2>See where you rank.</h2><p>Online score sharing is optional. Compete globally, follow friends, and aim for a higher personal record.</p>
+<div class="ctas"><a class="main" href="https://xavier-is-working.com/leaderboard.html">View Online Rankings</a><a class="alt" href="https://xavier-is-working.com/">Developer Website</a></div>
+</div></div></section>
+</main>
+<footer class="bottom"><div class="wrap">
+<div>Chisa Moonlight Flight! <span aria-hidden="true"> | </span> Version 1.6 preview</div>
+<div><a href="https://xavier-is-working.com/support.html">Support</a><a href="https://xavier-is-working.com/privacy.html">Privacy</a><a href="https://apps.apple.com/app/id6825587415">App Store</a></div>
+</div></footer>
+</body></html>
