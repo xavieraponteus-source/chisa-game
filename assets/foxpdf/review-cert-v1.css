@@ -1,0 +1,28 @@
+
+/* FoxPDF Studio private review / certificate signing — premium black and gold */
+.fx-review-lock{overflow:hidden}
+.fx-review-backdrop{position:fixed;inset:0;background:#000c;z-index:9999;display:grid;place-items:center;padding:18px;color:#fff1d2;font-family:"DM Sans",system-ui,sans-serif;backdrop-filter:blur(8px)}
+.fx-review-modal{display:flex;flex-direction:column;width:min(880px,calc(100vw - 26px));max-height:92dvh;background:linear-gradient(155deg,#261c0f,#0e0d0a 57%);border:1px solid #e0af58;border-radius:20px;overflow:hidden;box-shadow:0 18px 90px #000e,0 0 28px #a8773552}
+.fx-review-header{padding:19px 22px;border-bottom:1px solid #80613b;display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.fx-review-header small{color:#e8b96b;letter-spacing:1.7px;font-size:10px;font-weight:800}
+.fx-review-header h2{font:italic 700 33px "Cormorant Garamond",Georgia,serif;margin:4px 0;color:#ffdfa3}
+.fx-review-header p{color:#d1b993;font-size:12px;line-height:1.5;margin:0}
+.fx-review-close{background:#382815;border:1px solid #a4773f;color:#ffdb9e;border-radius:10px;min-width:40px;min-height:40px;cursor:pointer}
+.fx-review-content{padding:21px 23px;overflow:auto;min-height:0}
+.fx-review-pane{display:flex;flex-direction:column;gap:13px}
+.fx-review-pane label{display:flex;flex-direction:column;gap:6px;color:#e4c38a;font-size:13px;font-weight:750}
+.fx-review-pane label:has(input[type=checkbox]){flex-direction:row;align-items:center}
+.fx-review-pane input:not([type=checkbox]){min-height:45px;background:#261e12;border:1px solid #8b632e;border-radius:9px;padding:11px;color:#fff3da;font-size:13px;max-width:100%}
+.fx-review-pane input[type=checkbox]{height:19px;width:19px;accent-color:#dcac57}
+.fx-review-warning{border:1px solid #98783b;background:#3a2a1477;border-radius:10px;padding:12px;font-size:12px;line-height:1.6;color:#f1d9a6}
+.fx-review-button,.fx-review-download{display:inline-flex;align-items:center;justify-content:center;min-height:39px;padding:9px 13px;border-radius:11px;border:1px solid #a27637;background:#291c0e;color:#f9ddb2;font-size:12px;font-weight:800;cursor:pointer;text-decoration:none}
+.fx-review-button.gold{background:linear-gradient(110deg,#fff2bf,#dba14a);border-color:#ffde9e;color:#180f06}
+.fx-review-button:hover{filter:brightness(1.12)}.fx-review-button:disabled{opacity:.5}
+.fx-review-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:7px}
+.fx-review-actions button{white-space:nowrap}
+.fx-recent-head .fx-review-actions{margin-left:auto}
+.fx-review-muted{color:#cab18b;font-size:12px}
+.fx-review-pdf{height:370px;width:100%;border:1px solid #9d7030;border-radius:12px;background:#fff}
+.fx-review-comments{display:flex;flex-direction:column;gap:9px}
+.fx-review-comment{padding:12px;border:1px solid #5c4724;background:#1f180e;border-radius:10px}.fx-review-comment b{color:#f6d595;font-size:12px}.fx-review-comment p{white-space:pre-wrap;font-size:13px;margin:6px 0}.fx-review-comment small{color:#ac9678;font-size:10px}
+@media(max-width:700px){.fx-review-header h2{font-size:27px}.fx-review-content{padding:13px}.fx-review-backdrop{padding:9px}.fx-review-actions button{font-size:10px!important;padding:6px!important}.fx-review-pdf{height:300px}}
