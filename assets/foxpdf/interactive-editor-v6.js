@@ -12,7 +12,7 @@ view.innerHTML=[
 '<div class="fxie-layout"><aside class="fxie-left"><div class="fxie-lefthead"><h2>Edit</h2><div><button id="fxiePanelDone" class="fxie-paneldone" type="button">Done</button><button id="fxieInfo" title="About editing">⚙</button></div></div>',
 '<p class="fxie-label">EDIT CONTENT</p><button class="fxie-tool selected" data-mode="select"><i>↖</i> Select text</button><button class="fxie-tool" data-mode="edit"><i>✎</i> Edit existing text</button>',
 '<p class="fxie-label">ADD CONTENT</p><button class="fxie-tool" data-mode="text"><i>T</i> Text</button><button class="fxie-tool" data-mode="image"><i>▧</i> Image</button><button class="fxie-tool" data-mode="highlight"><i>▰</i> Highlight</button><button class="fxie-tool" data-mode="draw"><i>✍</i> Draw / Handwrite</button><div class="fxie-ink-options"><label>Pen thickness <input id="fxiePenWidth" type="range" min="0.75" max="8" step="0.25" value="2.5"></label><span id="fxiePenLabel">2.5 pt</span></div><button class="fxie-tool" id="fxieComments"><i>☏</i> Comments & annotations</button>',
-'<p class="fxie-label">TEXT FORMAT</p><div class="fxie-controls"><label>Font<select id="fxieFont"><option value="Helvetica">Helvetica</option><option value="TimesRoman">Times New Roman</option><option value="Courier">Courier</option></select></label><div class="fxie-two"><label>Size<input type="number" id="fxieSize" min="5" max="80" value="14"></label><label>Color<input type="color" id="fxieColor" value="#172846"></label></div></div>',
+'<p class="fxie-label">TEXT FORMAT</p><div class="fxie-controls"><label>Font style<select id="fxieFont"><option value="Helvetica">Helvetica</option><option value="HelveticaBold">Helvetica Bold</option><option value="HelveticaOblique">Helvetica Italic</option><option value="HelveticaBoldOblique">Helvetica Bold Italic</option><option value="TimesRoman">Times Roman</option><option value="TimesRomanBold">Times Bold</option><option value="TimesRomanItalic">Times Italic</option><option value="TimesRomanBoldItalic">Times Bold Italic</option><option value="Courier">Courier</option><option value="CourierBold">Courier Bold</option><option value="CourierOblique">Courier Oblique</option><option value="CourierBoldOblique">Courier Bold Italic</option><option value="Symbol">Symbol</option><option value="ZapfDingbats">Zapf Dingbats</option></select></label><div class="fxie-font-advanced"><button type="button" id="fxieFontScan" class="fxie-tool">Find installed fonts</button><button type="button" id="fxieFontUpload" class="fxie-tool">Import TTF/OTF</button><input type="file" id="fxieFontFile" accept=".ttf,.otf,font/ttf,font/otf" hidden></div><small id="fxieFontHelp">Core font styles are ready. Import an installed font file to embed it into the PDF.</small><div class="fxie-two"><label>Size<input type="number" id="fxieSize" min="5" max="80" value="14"></label><label>Color<input type="color" id="fxieColor" value="#172846"></label></div></div>',
 '<div class="fxie-editbox" id="fxieReplaceBox" hidden><p class="fxie-label">SELECTED PARAGRAPH</p><label>Paragraph<select id="fxieParagraph"></select></label><label>Replacement text<textarea id="fxieReplacement" rows="5"></textarea></label><p class="fxie-caution">Local visual editing stays on your device; the original text may still be recoverable or searchable. Advanced reflow uses a temporary PDF upload over HTTPS to FoxPDF Railway without additional popups. Review the result before saving. For sensitive information use Permanent Redaction.</p><button id="fxieApply" class="fxie-primary">Apply local text edit</button><button id="fxieCloudReflow" class="fxie-advanced-reflow" type="button">Advanced reflow · uses Railway</button></div>',
 '<div class="fxie-editbox" id="fxieInsertBox" hidden><label>Text to insert<textarea id="fxieInsertText" rows="4">New text</textarea></label><p class="fxie-hint">Click on the PDF page to place your text.</p></div>',
 '<div class="fxie-bottom"><button id="fxieAdvanced">Advanced tools</button><button id="fxieChisa">Ask Chisa for help</button><p>For privacy-sensitive text, use Permanent Redaction instead of covering content.</p></div></aside>',
@@ -91,9 +91,71 @@ try{
 }
 async function mutate(fn,description){const original=app.readCurrent();if(!original)return;if(!window.PDFLib)return say("Editing engine is unavailable.",true);
 try{const pdf=await PDFLib.PDFDocument.load(original.bytes.slice(0));await fn(pdf);const result=new Uint8Array(await pdf.save({useObjectStreams:true}));if(original.bytes.length<8*1024*1024){undo.push(original.bytes);if(undo.length>7)undo.shift();redo=[]}await app.replace(result);say(description);return true}catch(e){say("Edit failed: "+e.message,true);return false}}
+
+const fxieFontBytes = new Map();
+let fxieFontKitPromise = null;
+async function fxieFontKit(){
+ if(window.fontkit) return window.fontkit;
+ if(!fxieFontKitPromise) fxieFontKitPromise = new Promise((resolve,reject)=>{
+  const script=document.createElement("script");
+  script.src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js";
+  script.async=true;script.onload=()=>window.fontkit?resolve(window.fontkit):reject(Error("Font extension did not load"));
+  script.onerror=()=>reject(Error("Font extension is unavailable; check your connection"));
+  document.head.appendChild(script);
+ });
+ return fxieFontKitPromise;
+}
+async function fxieEmbedSelectedFont(pdf, name){
+ const choice=name||$("fxieFont").value;
+ if(fxieFontBytes.has(choice)){
+  pdf.registerFontkit(await fxieFontKit());
+  return pdf.embedFont(fxieFontBytes.get(choice),{subset:true});
+ }
+ return pdf.embedFont(PDFLib.StandardFonts[choice]||PDFLib.StandardFonts.Helvetica);
+}
+function fxieAddFontOption(label,bytes,style){
+ const key="custom:"+label+":"+fxieFontBytes.size;
+ fxieFontBytes.set(key,new Uint8Array(bytes));
+ const option=new Option(label,key);option.style.fontFamily=label.split(" — ")[0];
+ $("fxieFont").add(option);$("fxieFont").value=key;
+ $("fxieFontHelp").textContent=label+" — ready to embed with your PDF.";
+}
+$("fxieFontUpload").onclick=()=>$("fxieFontFile").click();
+$("fxieFontFile").onchange=async e=>{
+ const file=e.target.files?.[0];e.target.value="";
+ if(!file)return;
+ if(!/\.(ttf|otf)$/i.test(file.name)||file.size>12*1024*1024){
+  say("Choose a TTF or OTF font file smaller than 12 MB.",true);return;
+ }
+ try { fxieAddFontOption(file.name.replace(/\.(ttf|otf)$/i,""),await file.arrayBuffer()); }
+ catch(err){ say("Font could not be loaded: "+err.message,true); }
+};
+$("fxieFontScan").onclick=async ()=>{
+ if(!("queryLocalFonts" in window)){say("This browser cannot list installed fonts. Use Import TTF/OTF instead.",true);return;}
+ try{
+  const fonts=await window.queryLocalFonts();
+  if(!fonts.length){say("No locally installed fonts were authorized.",true);return;}
+  const already=new Set([...$("fxieFont").options].map(x=>x.textContent));
+  for(const font of fonts.slice(0,600)){
+   const label=font.family+" — "+font.style;
+   if(already.has(label))continue;
+   const key="device:"+font.postscriptName;
+   if(fxieFontBytes.has(key))continue;
+   try {
+    const blob=await font.blob(),data=await blob.arrayBuffer();
+    if(data.byteLength>12*1024*1024)continue;
+    fxieFontBytes.set(key,new Uint8Array(data));
+    const option=new Option(label,key);option.style.fontFamily=font.family;
+    $("fxieFont").add(option);already.add(label);
+   }catch{}
+  }
+  $("fxieFontHelp").textContent="Available device fonts are listed. Selected fonts will be embedded in exported PDFs.";
+ }catch(err){say("Font access denied or unsupported. Import TTF/OTF instead.",true);}
+};
+
 function color(){const s=$("fxieColor").value.slice(1);return PDFLib.rgb(parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255)}
 async function placeText(p){if(!p||!check())return;const text=$("fxieInsertText").value.trim();if(!text)return say("Type some text first.",true);const size=Number($("fxieSize").value);if(size<5||size>80)return say("Font size must be between 5 and 80.",true);
-await mutate(async pdf=>{const pg=pdf.getPage(app.current().page-1),font=await pdf.embedFont(PDFLib.StandardFonts[$("fxieFont").value]);const x=p.x/rendered.scale,y=pg.getHeight()-p.y/rendered.scale-size;pg.drawText(text,{x,y,font,size,color:color(),maxWidth:pg.getWidth()-x-8,lineHeight:size*1.32})},"Text added to page "+app.current().page+".")}
+await mutate(async pdf=>{const pg=pdf.getPage(app.current().page-1),font=await fxieEmbedSelectedFont(pdf,$("fxieFont").value);const x=p.x/rendered.scale,y=pg.getHeight()-p.y/rendered.scale-size;pg.drawText(text,{x,y,font,size,color:color(),maxWidth:pg.getWidth()-x-8,lineHeight:size*1.32})},"Text added to page "+app.current().page+".")}
 $("fxieImageFile").onchange=async e=>{const f=e.target.files?.[0];e.target.value="";if(!f)return;if(!["image/png","image/jpeg"].includes(f.type)||f.size>8*1024*1024)return say("Select a PNG/JPEG smaller than 8 MB.",true);pendingImage={bytes:new Uint8Array(await f.arrayBuffer()),type:f.type};say("Image ready. Click the PDF to place it.")};
 async function placeImage(p){if(!p||!check())return;if(!pendingImage)return $("fxieImageFile").click();await mutate(async pdf=>{const pg=pdf.getPage(app.current().page-1),img=pendingImage.type==="image/png"?await pdf.embedPng(pendingImage.bytes):await pdf.embedJpg(pendingImage.bytes),w=Math.min(200,img.width,pg.getWidth()*.45),h=w*img.height/img.width;pg.drawImage(img,{x:Math.max(0,Math.min(pg.getWidth()-w,p.x/rendered.scale)),y:Math.max(0,Math.min(pg.getHeight()-h,pg.getHeight()-p.y/rendered.scale-h)),width:w,height:h})},"Image inserted in PDF.")}
 function drawHighlightPreview(overlay){overlay.replaceChildren();const a=drawing.start,b=drawing.end;if(!a||!b)return;const square=el("div","fxie-highlight-box");Object.assign(square.style,{left:Math.min(a.x,b.x)+"px",top:Math.min(a.y,b.y)+"px",width:Math.abs(a.x-b.x)+"px",height:Math.abs(a.y-b.y)+"px"});overlay.append(square)}
@@ -260,7 +322,7 @@ async function applyLocal(){
   // Appearance-only edit, not content removal or redaction. The old text may remain in streams.
   pg.drawRectangle({x:Math.max(0,x-1.3),y:coverY,width:Math.min(w+3.5,pdfSize.width-x+1.3),height:coverHeight,color:bg});
   if(value.trim()){
-   const font=await doc.embedFont(PDFLib.StandardFonts[chosenFont]||PDFLib.StandardFonts.Helvetica);
+   const font=await fxieEmbedSelectedFont(doc,chosenFont);
    const colorValue=color(),lineHeight=size*1.16;
    const maxWidth=Math.max(18,Math.min(pdfSize.width-x-10,Math.max(w*1.3,font.widthOfTextAtSize(state.text,size)+20)));
    // Existing PDF embedded fonts may not be available for drawing, so use the closest supported standard font.
