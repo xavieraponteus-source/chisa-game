@@ -37,7 +37,7 @@ try{
  const pdfjs=await getJs(),reader=await pdfjs.getDocument({data:app.bytes().slice(0)}).promise;
  if(token!==renderVersion){reader.destroy();return}
  const page=await reader.getPage(d.page),base=page.getViewport({scale:1}),container=$("fxieScroll");
- const scale=zoom==="fit"?Math.min(2.5,Math.max(.55,(Math.max(380,container.clientWidth)-70)/base.width)):Number(zoom),vp=page.getViewport({scale});
+ const effectiveWidth=splitPage?Math.max(250,(container.clientWidth-100)/2):Math.max(380,container.clientWidth);const scale=zoom==="fit"?Math.min(2.5,Math.max(.45,(effectiveWidth-55)/base.width)):Number(zoom),vp=page.getViewport({scale});
  const sheet=el("div","fxie-sheet"),canvas=el("canvas","fxie-paper"),layer=el("div","fxie-textlayer"),overlay=el("div","fxie-drawing");
  sheet.style.width=vp.width+"px";sheet.style.height=vp.height+"px";
  canvas.width=Math.ceil(vp.width*devicePixelRatio);canvas.height=Math.ceil(vp.height*devicePixelRatio);canvas.style.width=vp.width+"px";canvas.style.height=vp.height+"px";
@@ -436,7 +436,9 @@ async function renderThumbnails(){
  selectedThumb=Math.max(1,Math.min(d.pages,selectedThumb||d.page));
  mini.replaceChildren();mini.append(thumbsInput);
  const header=el("div","fxie-organizer-head");
- header.append(el("h3","","Organize Pages"),el("p","","Drag pages to reorder. Tap a page to select."));
+ header.append(el("h3","","Organize Pages"),el("p","","Drag pages to reorder. Tap to select."));
+ const closeThumbs=el("button","fxie-org-close","✕");closeThumbs.type="button";closeThumbs.setAttribute("aria-label","Close page organizer");
+ closeThumbs.onclick=()=>toggleOrganizer();header.append(closeThumbs);
  mini.append(header);header.append(el("p","fxie-touch-tip","On phones: drag using the ⋮⋮ handle, or use ↑ / ↓ below."));
  const actions=el("div","fxie-organizer-actions");
  const control=(text,fn,title)=>{
@@ -542,6 +544,51 @@ async function renderThumbnails(){
   for(const node of nodes.slice(0,Math.min(24,nodes.length)))await renderOne(node);
  }
 }
+
+/* Same-document dual page viewer. Selecting a thumbnail's ⇿ control opens it beside the current page. */
+let splitPane=null,splitReader=null,splitToken=0;
+function closeSplitView(){
+ ++splitToken;splitPage=0;
+ if(splitReader){try{splitReader.destroy()}catch(_){}splitReader=null}
+ splitPane?.remove();splitPane=null;
+ $("fxieScroll").classList.remove("fxie-split-active");
+ say("Returned to single-page view.");
+ draw();
+}
+async function setSplitView(pageNumber){
+ const current=app.current();if(!current)return;
+ const n=Number(pageNumber);
+ if(!Number.isInteger(n)||n<1||n>current.pages){say("Choose a page in this PDF.",true);return}
+ if(splitPane&&splitPage===n){closeSplitView();return}
+ splitPage=n;const token=++splitToken;
+ const scroll=$("fxieScroll");
+ if(!splitPane){splitPane=el("aside","fxie-split-pane");scroll.append(splitPane)}
+ scroll.classList.add("fxie-split-active");
+ splitPane.replaceChildren();
+ const header=el("div","fxie-split-head");
+ const title=el("strong","","Page "+n+" · side-by-side");
+ const close=el("button","","✕");close.type="button";close.title="Close split view";close.onclick=closeSplitView;
+ header.append(title,close);
+ const canvasWrap=el("div","fxie-split-content"),placeholder=el("p","fxie-split-message","Rendering page "+n+"…");
+ canvasWrap.append(placeholder);splitPane.append(header,canvasWrap);
+ try{
+  const lib=await getJs(),reader=await lib.getDocument({data:app.bytes().slice()}).promise;
+  if(token!==splitToken){reader.destroy();return}
+  if(splitReader){try{splitReader.destroy()}catch(_){}}
+  splitReader=reader;
+  const pg=await reader.getPage(n),base=pg.getViewport({scale:1});
+  const available=Math.max(220,scroll.clientWidth<750?scroll.clientWidth-35:(scroll.clientWidth-110)/2);
+  const view=pg.getViewport({scale:Math.max(.24,Math.min(1.5,available/base.width))});
+  const canvas=el("canvas","fxie-split-canvas");canvas.width=Math.ceil(view.width*devicePixelRatio);canvas.height=Math.ceil(view.height*devicePixelRatio);
+  canvas.style.width=view.width+"px";canvas.style.height=view.height+"px";
+  const ctx=canvas.getContext("2d");ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  await pg.render({canvasContext:ctx,viewport:view}).promise;
+  if(token!==splitToken)return;
+  canvasWrap.replaceChildren(canvas);
+  say("Side-by-side: page "+current.page+" and page "+n+". Choose another ⇿ thumbnail to change the right page.");
+ }catch(e){if(token===splitToken)canvasWrap.replaceChildren(el("p","fxie-split-message","Unable to open comparison page: "+e.message))}
+}
+
 function toggleOrganizer(){
  mini.hidden=!mini.hidden;
  if(!mini.hidden){selectedThumb=app.current()?.page||1;renderThumbnails().catch(e=>say("Unable to show page organizer: "+e.message,true))}
