@@ -315,3 +315,7 @@ body.fx-mode-editor .fx-assistant .chat-head b{font-size:25px!important}
  .fxie-right button{min-height:43px!important;min-width:35px!important}
  .fxie-scroll,.fxie-mini-pages{-webkit-overflow-scrolling:touch}
 }
+
+
+/* Ensure browser hidden state always overrides mobile drawer styles. */
+#fxieThumbnails.fxie-mini-pages[hidden],.fxie-organizer-dimmer[hidden]{display:none!important}
