@@ -223,24 +223,244 @@ bind("fxieSave",()=>app.save());bind("fxieShare",()=>window.FoxPDFReviews?.share
 bind("fxieAdvanced",()=>window.FoxPDFPro?window.FoxPDFPro.open("tools"):say("Advanced tools are loading. Please try again.",true));bind("fxieChisa",()=>window.FoxPDFChisaToggle?window.FoxPDFChisaToggle(true,true):$("chat").hidden=false);bind("fxieComments",()=>window.FoxPDFPro?.open("annotate"));
 bind("fxieSearch",()=>window.FoxPDFPro?.open("search"));bind("fxieProperties",()=>window.FoxPDFPro?.open("metadata"));bind("fxieMarkup",()=>window.FoxPDFPro?.open("annotate"));
 const mini=el("aside","fxie-mini-pages");mini.id="fxieThumbnails";mini.hidden=true;$("fxieScroll").prepend(mini);
-let thumbnailLoad=0;
-async function renderThumbnails(){
- const d=app.current();if(!d)return;const token=++thumbnailLoad;
- mini.replaceChildren();mini.append(el("h3","","Pages"));
- const items=el("div","fxie-mini-list");mini.append(items);
- const js=await getJs();const reader=await js.getDocument({data:app.bytes().slice(0)}).promise;
- try{for(let i=0;i<Math.min(d.pages,45);i++){
- if(token!==thumbnailLoad)return;
- const button=el("button","fxie-mini-page");button.type="button";
- if(d.page===i+1)button.classList.add("selected");
- const figure=el("canvas","fxie-mini-canvas"),caption=el("span","",String(i+1));button.append(figure,caption);button.onclick=()=>{app.setPage(i+1);mini.hidden=true};
- items.append(button);
- const page=await reader.getPage(i+1),viewport=page.getViewport({scale:.18});
- figure.width=Math.ceil(viewport.width);figure.height=Math.ceil(viewport.height);
- await page.render({canvasContext:figure.getContext("2d"),viewport}).promise;
- }}finally{reader.destroy?.()}
+
+/* Local-first visual page organizer: drag, add, delete, duplicate, move, rotate */
+let thumbnailLoad=0,selectedThumb=1,draggedThumb=0,thumbReader=null,thumbObserver=null,thumbRefreshTimer=null,organizerBusy=false,deletePending=false,splitPage=0;
+const thumbsInput=el("input");thumbsInput.type="file";thumbsInput.accept=".pdf,application/pdf";thumbsInput.multiple=true;thumbsInput.hidden=true;mini.append(thumbsInput);
+const organizeState=()=>app.current();
+const loadedPageCount=()=>organizeState()?.pages||0;
+const updateThumbSelection=()=>{
+ const d=organizeState();
+ if(!d)return;
+ mini.querySelectorAll("[data-page-index]").forEach(button=>{
+  const n=Number(button.dataset.pageIndex);
+  button.classList.toggle("selected",n===selectedThumb);
+  button.setAttribute("aria-current",n===d.page?"page":"false");
+ });
+ const statusBox=mini.querySelector(".fxie-selection");
+ if(statusBox)statusBox.textContent="Selected: page "+selectedThumb+" of "+d.pages;
+};
+function chooseThumbnail(n,navigate=true){
+ const count=loadedPageCount();selectedThumb=Math.max(1,Math.min(count,Number(n)||1));
+ deletePending=false;const del=mini.querySelector("#fxieDeleteSelected");if(del)del.textContent="Delete";
+ updateThumbSelection();
+ if(navigate&&organizeState()?.page!==selectedThumb)app.setPage(selectedThumb);
 }
-bind("fxiePages",()=>{mini.hidden=!mini.hidden;if(!mini.hidden)renderThumbnails().catch(e=>say("Could not load thumbnails: "+e.message,true))});
+function rememberPages(bytes){
+ if(bytes.length<8*1024*1024){undo.push(bytes.slice());if(undo.length>9)undo.shift();redo=[]}
+}
+async function updatePageDocument(transform,success,newPage){
+ if(organizerBusy)return false;
+ const source=app.readCurrent();if(!source)return false;
+ organizerBusy=true;
+ try{
+  const pdf=await PDFLib.PDFDocument.load(source.bytes.slice());
+  const replacement=await transform(pdf);
+  if(!replacement)return false;
+  const bytes=new Uint8Array(await replacement.save({useObjectStreams:true}));
+  rememberPages(source.bytes);
+  await app.replace(bytes);
+  const desired=Math.max(1,Math.min(app.current().pages,Number(newPage)||selectedThumb));
+  selectedThumb=desired;
+  if(app.current().page!==desired)app.setPage(desired);
+  say(success);
+  return true;
+ }catch(err){
+  say("Couldn't organize pages: "+String(err?.message||err),true);
+  return false;
+ }finally{
+  organizerBusy=false;
+  if(!mini.hidden)queueMicrotask(()=>renderThumbnails().catch(e=>say("Thumbnail error: "+e.message,true)));
+ }
+}
+function retainMetadata(original,copy){
+ try{const title=original.getTitle();if(title)copy.setTitle(title)}catch(_){}
+ try{const author=original.getAuthor();if(author)copy.setAuthor(author)}catch(_){}
+ try{const subject=original.getSubject();if(subject)copy.setSubject(subject)}catch(_){}
+ try{const creator=original.getCreator();if(creator)copy.setCreator(creator)}catch(_){}
+ try{const producer=original.getProducer();if(producer)copy.setProducer(producer)}catch(_){}
+}
+async function moveThumbnail(from,to){
+ const d=organizeState();if(!d)return;
+ from=Number(from);to=Number(to);
+ if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<1||from>d.pages||to>d.pages||from===to)return;
+ const order=Array.from({length:d.pages},(_,i)=>i+1);order.splice(from-1,1);order.splice(to-1,0,from);
+ await updatePageDocument(async pdf=>{
+  if(pdf.getForm().getFields().length)throw Error("Reordering fillable-form PDFs can damage fields. Flatten a copy first.");
+  const reformed=await PDFLib.PDFDocument.create();
+  const newPages=await reformed.copyPages(pdf,order.map(i=>i-1));
+  for(const pg of newPages)reformed.addPage(pg);
+  retainMetadata(pdf,reformed);
+  return reformed;
+ },"Moved page "+from+" to position "+to+". Save PDF to keep the change.",to);
+}
+async function addBlank(){
+ const d=organizeState();if(!d)return;
+ const insertAfter=selectedThumb;
+ await updatePageDocument(async pdf=>{
+  const previous=pdf.getPage(Math.max(0,insertAfter-1)),{width,height}=previous.getSize();
+  pdf.insertPage(insertAfter,[width,height]);
+  return pdf;
+ },"Added a blank page after page "+insertAfter+".",insertAfter+1);
+}
+async function duplicatePage(){
+ const d=organizeState();if(!d)return;
+ const n=selectedThumb;
+ await updatePageDocument(async pdf=>{
+  const [copied]=await pdf.copyPages(pdf,[n-1]);
+  pdf.insertPage(n,copied);
+  return pdf;
+ },"Duplicated page "+n+".",n+1);
+}
+async function rotateSelected(){
+ const n=selectedThumb;
+ await updatePageDocument(async pdf=>{
+  const page=pdf.getPage(n-1);
+  page.setRotation(PDFLib.degrees((page.getRotation().angle+90)%360));
+  return pdf;
+ },"Rotated page "+n+" clockwise.",n);
+}
+async function deleteSelected(){
+ const count=loadedPageCount();
+ if(count<=1){say("A PDF must contain at least one page. Start a new PDF to make a blank document.",true);return}
+ const button=mini.querySelector("#fxieDeleteSelected");
+ if(!deletePending){
+  deletePending=true;
+  if(button)button.textContent="Confirm delete";
+  say("Click Confirm delete to remove page "+selectedThumb+". You can undo this.");
+  return;
+ }
+ deletePending=false;if(button)button.textContent="Delete";
+ const n=selectedThumb;
+ await updatePageDocument(async pdf=>{pdf.removePage(n-1);return pdf},"Deleted page "+n+". You can undo before leaving the editor.",Math.min(n,count-1));
+}
+async function insertFilePages(files){
+ const list=Array.from(files||[]);
+ if(!list.length)return;
+ const after=selectedThumb;let count=0;
+ await updatePageDocument(async pdf=>{
+  let index=after;
+  for(const file of list){
+   if(!/\.pdf$/i.test(file.name)&&file.type!=="application/pdf")throw Error("Choose PDF files only");
+   if(file.size>40*1024*1024)throw Error("Individual files must be under 40 MB");
+   const other=await PDFLib.PDFDocument.load(new Uint8Array(await file.arrayBuffer()));
+   if(pdf.getPageCount()+other.getPageCount()>400)throw Error("The page limit for this organizer is 400");
+   const copies=await pdf.copyPages(other,other.getPageIndices());
+   copies.forEach(p=>pdf.insertPage(index++,p));
+   count+=copies.length;
+  }
+  return pdf;
+ },"Inserted "+count+" page(s) after page "+after+".",after+1);
+}
+thumbsInput.addEventListener("change",async e=>{
+ const files=Array.from(e.target.files||[]);e.target.value="";
+ await insertFilePages(files);
+});
+async function renderThumbnails(){
+ const d=app.current();if(!d||mini.hidden)return;
+ const token=++thumbnailLoad;
+ if(thumbObserver)thumbObserver.disconnect();
+ if(thumbReader){try{thumbReader.destroy()}catch(_){}thumbReader=null}
+ selectedThumb=Math.max(1,Math.min(d.pages,selectedThumb||d.page));
+ mini.replaceChildren();mini.append(thumbsInput);
+ const header=el("div","fxie-organizer-head");
+ header.append(el("h3","","Organize Pages"),el("p","","Drag pages to reorder. Tap a page to select."));
+ mini.append(header);
+ const actions=el("div","fxie-organizer-actions");
+ const control=(text,fn,title)=>{
+  const b=el("button","fxie-organizer-action",text);b.type="button";b.title=title||text;b.addEventListener("click",fn);actions.append(b);return b
+ };
+ control("+ Blank",addBlank,"Insert a blank page after selected page");
+ control("+ PDF",()=>thumbsInput.click(),"Insert pages from another PDF");
+ control("Duplicate",duplicatePage,"Duplicate selected page");
+ control("↻ Rotate",rotateSelected,"Rotate the selected page");
+ const moveUp=control("↑",()=>moveThumbnail(selectedThumb,Math.max(1,selectedThumb-1)),"Move selected page up");
+ const moveDown=control("↓",()=>moveThumbnail(selectedThumb,Math.min(d.pages,selectedThumb+1)),"Move selected page down");
+ const deleteButton=control("Delete",deleteSelected,"Delete selected page");
+ deleteButton.id="fxieDeleteSelected";
+ const splitButton=control("⇿ Side by side",()=>setSplitView(selectedThumb),"Show selected page beside current page");
+ mini.append(actions,el("p","fxie-selection","Selected: page "+selectedThumb+" of "+d.pages));
+ const list=el("div","fxie-mini-list");list.setAttribute("role","list");mini.append(list);
+ const nodes=[];
+ for(let i=1;i<=d.pages;i++){
+  const tile=el("div","fxie-thumb-tile");tile.dataset.pageIndex=i;tile.setAttribute("role","listitem");
+  const handle=el("span","fxie-thumb-handle","⋮⋮");handle.draggable=true;
+  handle.title="Drag to move page "+i;
+  const preview=el("button","fxie-thumb-preview");preview.type="button";preview.dataset.pageIndex=i;
+  preview.title="Select page "+i;preview.setAttribute("aria-label","Select page "+i);
+  const image=el("canvas","fxie-mini-canvas");image.dataset.page=i;
+  const placeholder=el("span","fxie-thumb-placeholder","PDF");
+  preview.append(image,placeholder);
+  const footer=el("div","fxie-thumb-footer");
+  footer.append(handle,el("span","fxie-thumb-number","Page "+i));
+  const beside=el("button","fxie-thumb-beside","⇿");beside.type="button";beside.title="Open page "+i+" next to current page";beside.setAttribute("aria-label","View page "+i+" beside current page");beside.onclick=()=>setSplitView(i);footer.append(beside);
+  tile.append(preview,footer);list.append(tile);nodes.push({tile,preview,image,placeholder});
+  preview.onclick=()=>chooseThumbnail(i,true);
+  preview.addEventListener("keydown",e=>{
+   if(e.key==="ArrowUp"||e.key==="ArrowDown"){
+    e.preventDefault();moveThumbnail(i,Math.max(1,Math.min(d.pages,i+(e.key==="ArrowUp"?-1:1))));
+   }
+  });
+  handle.addEventListener("dragstart",e=>{
+   draggedThumb=i;e.dataTransfer.effectAllowed="move";
+   e.dataTransfer.setData("text/plain","foxpdf-page:"+i);
+   tile.classList.add("fxie-dragging");
+  });
+  handle.addEventListener("dragend",()=>{draggedThumb=0;list.querySelectorAll(".fxie-drop-before,.fxie-drop-after,.fxie-dragging").forEach(x=>x.classList.remove("fxie-drop-before","fxie-drop-after","fxie-dragging"))});
+  tile.addEventListener("dragover",e=>{
+   const value=e.dataTransfer.types.includes("text/plain");
+   if(!draggedThumb&&!value)return;
+   e.preventDefault();e.dataTransfer.dropEffect="move";
+   const after=e.clientY>tile.getBoundingClientRect().top+tile.offsetHeight/2;
+   list.querySelectorAll(".fxie-drop-before,.fxie-drop-after").forEach(x=>x.classList.remove("fxie-drop-before","fxie-drop-after"));
+   tile.classList.add(after?"fxie-drop-after":"fxie-drop-before");
+  });
+  tile.addEventListener("drop",async e=>{
+   e.preventDefault();e.stopPropagation();
+   const dragText=e.dataTransfer.getData("text/plain")||"";
+   const from=draggedThumb||Number(dragText.match(/^foxpdf-page:(\d+)$/)?.[1]);
+   draggedThumb=0;
+   list.querySelectorAll(".fxie-drop-before,.fxie-drop-after").forEach(x=>x.classList.remove("fxie-drop-before","fxie-drop-after"));
+   if(!from||from===i)return;
+   const after=e.clientY>tile.getBoundingClientRect().top+tile.offsetHeight/2;
+   const order=Array.from({length:d.pages},(_,j)=>j+1).filter(n=>n!==from);
+   let at=order.indexOf(i);if(at<0)return;if(after)at++;
+   await moveThumbnail(from,at+1);
+  });
+ }
+ updateThumbSelection();
+ moveUp.disabled=selectedThumb<=1;moveDown.disabled=selectedThumb>=d.pages;
+ const js=await getJs(),reader=await js.getDocument({data:app.bytes().slice()}).promise;
+ if(token!==thumbnailLoad){reader.destroy();return}
+ thumbReader=reader;
+ const renderOne=async node=>{
+  if(token!==thumbnailLoad||node.image.dataset.done==="1")return;
+  node.image.dataset.done="1";
+  try{
+   const n=Number(node.image.dataset.page),pg=await reader.getPage(n);
+   const viewport=pg.getViewport({scale:Math.min(.3,122/pg.getViewport({scale:1}).width)});
+   node.image.width=Math.max(1,Math.ceil(viewport.width));
+   node.image.height=Math.max(1,Math.ceil(viewport.height));
+   await pg.render({canvasContext:node.image.getContext("2d"),viewport}).promise;
+   if(token===thumbnailLoad)node.placeholder.remove();
+  }catch(e){node.placeholder.textContent="Preview unavailable"}
+ };
+ if(typeof IntersectionObserver!=="undefined"){
+  thumbObserver=new IntersectionObserver(entries=>{
+   for(const entry of entries)if(entry.isIntersecting){thumbObserver.unobserve(entry.target);const found=nodes.find(n=>n.image===entry.target);if(found)renderOne(found)}
+  },{root:mini,rootMargin:"200px"});
+  nodes.forEach(n=>thumbObserver.observe(n.image));
+ }else{
+  for(const node of nodes.slice(0,Math.min(24,nodes.length)))await renderOne(node);
+ }
+}
+function toggleOrganizer(){
+ mini.hidden=!mini.hidden;
+ if(!mini.hidden){selectedThumb=app.current()?.page||1;renderThumbnails().catch(e=>say("Unable to show page organizer: "+e.message,true))}
+ else{thumbnailLoad++;thumbObserver?.disconnect();thumbReader?.destroy?.();thumbReader=null}
+}
+bind("fxiePages",toggleOrganizer);
+
 bind("fxiePanelDone",()=>view.classList.add("fxie-drawer-closed"));bind("fxieRotate",()=>app.click("rotate"));bind("fxieAddPage",()=>app.click("blankPage"));bind("fxieDelete",()=>app.click("delete"));
 bind("fxiePrev",()=>{const d=app.current();if(d)app.setPage(Math.max(1,d.page-1))});bind("fxieNext",()=>{const d=app.current();if(d)app.setPage(Math.min(d.pages,d.page+1))});
 $("fxieZoom").onchange=e=>{zoom=e.target.value;draw()};
