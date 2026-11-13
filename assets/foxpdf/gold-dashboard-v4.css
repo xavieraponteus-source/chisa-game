@@ -146,3 +146,30 @@ body.fx-neon-dashboard .fx-mode-editor .fx-recent{display:none}
 .fx-assistant .chat-head img{object-fit:cover!important;background:radial-gradient(circle,#513319,#070707 78%)!important;filter:none!important;border:2px solid #f6c575!important;box-shadow:0 0 17px #efb85c7a!important}
 .fx-assistant .chat-fab img{object-fit:contain!important;background:#111!important}
 @media(max-width:790px){.fx-brand .fx-art-fox-logo{width:53px!important;height:41px!important}.fx-brand{gap:2px!important}}
+
+
+/* FOXPDF_COLLAPSED_CHISA_V8 — closing Chisa leaves only the fox button */
+.fx-assistant.chat-widget.fx-chat-collapsed,
+body.fx-mode-editor .fx-assistant.chat-widget.fx-chat-collapsed{
+ position:fixed!important;top:auto!important;bottom:14px!important;right:14px!important;left:auto!important;
+ width:68px!important;height:68px!important;min-width:0!important;min-height:0!important;max-width:68px!important;max-height:68px!important;
+ padding:0!important;margin:0!important;border:0!important;background:transparent!important;box-shadow:none!important;overflow:visible!important;
+ border-radius:50%!important;z-index:550!important;pointer-events:none!important;
+}
+.fx-assistant.chat-widget.fx-chat-collapsed .chat-panel,
+.fx-assistant.chat-widget.fx-chat-collapsed .fox-chat-hint,
+.fx-assistant.chat-widget.fx-chat-collapsed .fx-chisa-illustration{display:none!important}
+.fx-assistant.chat-widget.fx-chat-collapsed .chat-fab,
+body.fx-mode-editor .fx-assistant.chat-widget.fx-chat-collapsed .chat-fab{
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ position:relative!important;right:auto!important;bottom:auto!important;top:auto!important;left:auto!important;
+ float:none!important;width:68px!important;height:68px!important;margin:0!important;
+ background:#080808!important;border:2px solid #e9b65f!important;border-radius:50%!important;
+ box-shadow:0 0 17px #d49d4966!important;pointer-events:auto!important;opacity:1!important;visibility:visible!important;
+}
+.fx-assistant.chat-widget.fx-chat-collapsed .chat-fab img{width:100%!important;height:100%!important;object-fit:cover!important;border-radius:50%!important}
+.fx-assistant.chat-widget:not(.fx-chat-collapsed) .chat-fab{display:none!important}
+.fx-brand .fx-art-fox-logo{object-fit:cover!important;border-radius:50%!important;animation:fxGoldBreath 4s ease-in-out infinite alternate!important}
+@keyframes fxGoldBreath{from{filter:drop-shadow(0 0 3px #eeac5488)}to{filter:drop-shadow(0 0 13px #ffe0a3)}}
+@media(prefers-reduced-motion:reduce){.fx-brand .fx-art-fox-logo{animation:none!important}}
+@media(max-width:620px){.fx-assistant.chat-widget.fx-chat-collapsed,body.fx-mode-editor .fx-assistant.chat-widget.fx-chat-collapsed{right:10px!important;bottom:12px!important;width:62px!important;height:62px!important}.fx-assistant.chat-widget.fx-chat-collapsed .chat-fab{width:62px!important;height:62px!important}}
