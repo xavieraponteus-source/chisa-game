@@ -8,8 +8,8 @@ ready(function(){
 const app=window.FoxPDFBridge;
 if(!app){console.warn("FoxPDF visual UI: PDF bridge unavailable; keeping original layout.");return}
 const $=(id)=>document.getElementById(id);
-const avatar="https://raw.githubusercontent.com/xavieraponteus-source/chisa-game/main/assets/foxpdf/geometric-gold-fox-user-v8.svg";
-const logo='<img class="fx-art-fox-logo" loading="eager" src="https://raw.githubusercontent.com/xavieraponteus-source/chisa-game/main/assets/foxpdf/geometric-gold-fox-user-v8.svg" alt="FoxPDF gold fox mask logo" width="69" height="66">';
+const avatar="https://raw.githubusercontent.com/xavieraponteus-source/chisa-game/main/assets/foxpdf/golden-fox-fixed-v10.webp";
+const logo='<img class="fx-art-fox-logo" loading="eager" src="https://raw.githubusercontent.com/xavieraponteus-source/chisa-game/main/assets/foxpdf/golden-fox-fixed-v10.webp" alt="FoxPDF gold fox mask logo" width="69" height="66">';
 const oldHeader=document.querySelector("header.site-nav");
 const easy=$("easyMode");
 if(!oldHeader||!easy){console.warn("FoxPDF visual UI: original controls missing.");return}
