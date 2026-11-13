@@ -1,0 +1,116 @@
+
+/* FoxPDF Studio — Black & Gold Dashboard v4
+ * True HTML controls; reference-matched layout; previous PDF runtime untouched.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600;1,700&family=DM+Sans:wght@400;500;600;700;800&display=swap');
+:root{--fx-top:70px;--fx-rail:242px;--fx-help:426px;--gold:#f0c26e;--gold-light:#ffe7ac;--gold-dark:#a36a24;--black:#090909}
+*{scrollbar-color:#85622d #111}
+html{scroll-behavior:smooth}
+body.fx-neon-dashboard{margin:0!important;background:#070707!important;background-image:radial-gradient(ellipse at 66% 36%,#36220f4d,transparent 35%),linear-gradient(130deg,#0d0d0d,#060606 57%,#160f07)!important;color:#f8efe0!important;font:14px/1.4 "DM Sans","Segoe UI",sans-serif!important}
+body.fx-neon-dashboard :is(button,input,select){font-family:"DM Sans","Segoe UI",sans-serif}
+body.fx-neon-dashboard :is(button,input,a):focus-visible{outline:2px solid #ffe09a!important;outline-offset:3px}
+body.fx-neon-dashboard button{transition:filter .16s ease,transform .16s ease,border-color .16s ease}
+body.fx-neon-dashboard button:hover{filter:brightness(1.15)}
+body.fx-neon-dashboard .site-nav.fx-top{height:70px!important;min-height:70px!important;position:sticky;top:0;z-index:100;background:linear-gradient(90deg,#080808,#101010 56%,#070707)!important;box-shadow:0 2px 16px #a4732828!important;border:0!important;border-bottom:1px solid #ba812f84!important;padding:7px 27px!important;gap:20px!important}
+.fx-brand{min-width:425px!important;align-items:center;gap:15px!important;color:#fff5e8!important}
+.fx-brand svg{width:63px!important;height:60px!important;filter:drop-shadow(0 0 10px #efa93b8b)!important}
+.fx-brand strong{font-family:"Cormorant Garamond",Georgia,serif!important;font-size:37px!important;font-style:italic!important;letter-spacing:-1.4px!important;font-weight:700!important;line-height:.93!important}
+.fx-brand strong em{color:#eac17d!important}.fx-brand small{color:#e9ded0!important;font-size:12px!important;letter-spacing:.1px!important;margin-top:4px!important}
+.fx-search{display:none!important}
+.fx-top-nav{gap:18px!important;justify-content:space-around!important;flex:1;margin:0!important}
+.fx-top-nav button,.fx-top-nav a{font:600 14px/1.1 "DM Sans",sans-serif!important;padding:12px 14px!important;border-radius:12px!important;color:#eee8de!important;background:transparent!important;border:1px solid transparent!important;box-shadow:none!important}
+.fx-top-nav button:hover,.fx-top-nav a:hover{color:#ffe3a2!important;background:#32220e!important;border-color:#ae7b35!important}
+.fx-top-nav .active,.fx-top-nav #fxTopHome{background:linear-gradient(130deg,#674216,#d3a04c 49%,#5e390e)!important;border:1px solid #f9cd79!important;color:#fff9e9!important;box-shadow:inset 0 1px 5px #fce5a65c,0 0 15px #d58d286b!important}
+.fx-top-nav #fxTopFiles,.fx-top-nav #fxTopChat,.fx-top-nav .fx-app-link{display:none!important}
+.fx-top-nav #easyMode{border:1px solid #5c472c!important;color:#f2cd91!important;font-size:11px!important}
+.fx-top-nav .fx-gold-extra{display:flex!important;align-items:center}
+.fx-rail{top:var(--fx-top)!important;width:var(--fx-rail)!important;padding:26px 12px 175px!important;background:linear-gradient(175deg,#090909,#0e0e0e 65%,#1b1208)!important;border-right:1px solid #97662696!important;box-shadow:inset -11px 0 35px #100c04b0!important;scrollbar-color:#7b5324 #0a0a0a!important}
+.fx-rail-title{display:none!important}
+.fx-rail button{border-radius:12px!important;color:#eee8dc!important;min-height:42px!important;gap:14px!important;font:500 14px/1.15 "DM Sans",sans-serif!important;padding:11px 14px!important;margin-bottom:4px!important}
+.fx-rail button i{color:#f0c56e!important;font-size:23px!important;min-width:25px!important}
+.fx-rail button.active{background:linear-gradient(100deg,#6e481b,#ffcb72 84%,#cb8c2b)!important;color:#271606!important;border:1px solid #fff0be!important;box-shadow:0 0 14px #df9b3a81,inset 0 1px 6px #fff5cfad!important}
+.fx-rail button.active i{color:#fff6d9!important}
+.fx-rail button:hover{background:#443018!important;border-color:#ca984c!important}
+.fx-rail-landscape{height:185px!important;background:radial-gradient(ellipse at 46% 97%,#c17a1f70,transparent 59%),linear-gradient(180deg,transparent,#2f1d0b 91%)!important}
+.fx-rail-landscape:before{content:""!important;clip-path:none!important;left:-60px!important;bottom:8px!important;width:345px!important;height:125px!important;background:conic-gradient(from 240deg at 48% 100%,transparent 0deg,#f1b961 23deg,#7f460f 37deg,#241205 47deg,transparent 72deg)!important;transform:rotate(-15deg);opacity:.8!important;filter:drop-shadow(0 0 9px #e8ab49)}
+.fx-rail-landscape:after{content:""!important;left:-25px!important;bottom:44px!important;width:290px!important;height:70px!important;border:5px solid transparent;border-top:3px solid #e0a052;border-radius:50%!important;filter:drop-shadow(0 0 12px #f1b45e)!important;transform:rotate(18deg)}
+.fx-rail-landscape span{display:none!important}
+.fx-neon-dashboard .shell{margin:0 calc(var(--fx-help) + 12px) 0 var(--fx-rail)!important;padding:12px 12px 100px!important;width:auto!important;max-width:none!important;min-width:0;background:radial-gradient(ellipse at 88% 25%,#2415084d,transparent 55%)!important}
+.fx-home-hero{height:278px!important;min-height:278px!important;overflow:hidden!important;margin:0!important;border:none!important;border-radius:0!important;background:radial-gradient(ellipse at 70% 58%,#30200f9c,transparent 55%),linear-gradient(95deg,#0a0a0a 0%,#11100d 55%,#090909 100%)!important;box-shadow:none!important}
+.fx-home-hero:before{content:""!important;display:block;position:absolute;right:-3%;top:-4%;width:58%;height:108%;background-image:url("https://xavieraponteus-source.github.io/chisa-game/assets/foxpdf/gold-pdf-illustration.svg")!important;background-repeat:no-repeat;background-size:contain;background-position:center;z-index:1;pointer-events:none}
+.fx-home-hero:after{content:""!important;position:absolute;right:0;bottom:-9px;width:100%;height:22px;background:linear-gradient(90deg,transparent,#e8a74985,transparent);filter:blur(8px);opacity:.55;pointer-events:none}
+.fx-hero-content{max-width:62%!important;z-index:2!important;padding:10px 18px 15px 28px!important}
+.fx-eyebrow{display:none!important}
+.fx-home-hero h1{font-family:"Cormorant Garamond",Georgia,serif!important;font-size:clamp(43px,4.5vw,70px)!important;font-weight:700!important;font-style:italic!important;letter-spacing:-1.8px!important;line-height:.92!important;color:#fff8ef!important;margin:0 0 16px!important;text-shadow:0 2px 7px #020202!important}
+.fx-home-hero h1 em{background:linear-gradient(120deg,#fff0b7,#ebb65e 57%,#a96e29)!important;background-clip:text!important;-webkit-background-clip:text!important;color:transparent!important}
+.fx-home-hero p{font-size:15px!important;max-width:390px!important;line-height:1.42!important;color:#f2ece7!important;margin:0 0 16px!important}
+.fx-hero-buttons{gap:12px!important}
+.fx-hero-buttons button{min-width:175px;border-radius:11px!important;padding:13px 18px!important;font-size:15px!important}
+.fx-hero-buttons .primary{background:linear-gradient(125deg,#fff0bb,#edbb63,#bd7420)!important;border:1px solid #ffdb86!important;color:#160f09!important;box-shadow:0 0 12px #e9a54b73!important}
+.fx-hero-buttons .secondary{background:linear-gradient(125deg,#242019,#0c0c0c)!important;border:1px solid #d1a15f!important;color:#fff2d8!important;box-shadow:none!important}
+.fx-tools-group{margin:0 16px!important}
+.fx-tools-heading{display:none!important}
+.fx-tool-grid{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:10px!important}
+.fx-tool-grid button{min-height:145px!important;border-radius:16px!important;padding:15px 8px 13px!important;color:#fff8ef!important;background:linear-gradient(165deg,#2b241b 0%,#0f0f0e 50%,#1a140c 92%)!important;border:1px solid #aa793b!important;box-shadow:inset 0 0 24px #b4762317,0 2px 4px #000,inset 0 -2px 9px #b87b2352!important;display:flex;align-items:center;justify-content:center;gap:6px;position:relative}
+.fx-tool-grid button:hover{transform:translateY(-3px)!important;box-shadow:0 0 14px #daa2476f,inset 0 0 16px #c390302d!important}
+.fx-tool-grid button i{font-style:normal;color:#ffd174!important;font-size:36px!important;line-height:1!important;text-shadow:0 0 9px #d9973891}
+.fx-tool-grid button b{font:700 15px/1.1 "DM Sans",sans-serif!important;color:#fff5ec!important}
+.fx-tool-grid button small{font:400 11px/1.25 "DM Sans",sans-serif!important;color:#e9e1d5!important;max-width:160px}
+.fx-power-strip{display:none!important}
+.fx-recent{margin:14px 15px 0!important;border-radius:17px!important;background:linear-gradient(125deg,#211a13,#0e0e0d 70%,#2b1e0f)!important;border:1px solid #ae7c3b!important;box-shadow:0 0 10px #96621d55,inset 0 0 25px #3d230b5c!important;padding:12px 16px!important;min-height:189px}
+.fx-recent-head{margin-bottom:7px!important}
+.fx-recent-head h2{font:700 24px/1 "Cormorant Garamond",Georgia,serif!important;color:#fff0d3!important}
+.fx-recent-head h2 small{font:400 10px "DM Sans",sans-serif!important;color:#a98d65!important}
+.fx-recent-head button{color:#f3d8a7!important;background:none!important;border:none!important;font-size:12px!important}
+.fx-recent-row{grid-template-columns:1.35fr .95fr!important;gap:12px!important}
+.fx-recent-list{background:#0c0c0bf2!important;border:1px solid #57412b!important;border-radius:10px!important;min-height:133px!important;max-height:155px!important;overflow:auto}
+.fx-recent-list button{background:#11100e!important;color:#fbf2e9!important;border-color:#4c3920!important;font-size:11px!important}
+.fx-recent-list button:hover{background:#302313!important}
+.fx-recent-list .fx-empty{color:#cdbfa8!important;padding:19px!important;font-size:13px}
+.fx-recent #drop{min-height:133px!important;max-height:160px!important;border:2px dashed #e8b65c!important;border-radius:11px!important;background:radial-gradient(ellipse at 80% 110%,#5d341380,transparent 48%),#0c0b0a!important;padding:14px 9px!important;box-shadow:inset 0 0 14px #9b651a4a!important}
+.fx-recent #drop strong{font-size:13px!important;color:#fff0da!important}
+.fx-recent #drop p{font-size:10px!important;color:#e0c9a4!important}
+.fx-recent #drop .button{border:1px solid #b78c47!important;background:linear-gradient(115deg,#312416,#65431b)!important;color:#ffefd0!important;font-size:11px!important;padding:6px 10px!important;box-shadow:none!important}
+.fx-neon-dashboard .footer{color:#9d8968!important}
+.fx-assistant.chat-widget{position:fixed!important;right:16px!important;top:100px!important;bottom:55px!important;width:calc(var(--fx-help) - 29px)!important;height:auto!important;z-index:42!important;border:1px solid #d59a48!important;border-radius:22px!important;background:linear-gradient(175deg,#15110c,#070707 50%,#130e08)!important;box-shadow:0 0 0 2px #25180c,0 0 22px #bd842949!important;overflow:hidden!important;padding:0!important}
+.fx-assistant .chat-panel{display:flex;flex-direction:column;position:relative;width:100%!important;height:100%!important;max-height:none!important;margin:0!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;color:#fff7eb!important;overflow:hidden}
+.fx-assistant .chat-panel[hidden]{display:none!important}
+.fx-assistant .chat-head{min-height:142px!important;padding:16px 19px 10px!important;display:flex!important;align-items:flex-start!important;gap:14px!important;background:none!important;border:0!important;color:#f8d28e!important}
+.fx-assistant .chat-head img{width:91px!important;height:91px!important;object-fit:cover!important;border-radius:50%!important;border:2px solid #f3c57c!important;box-shadow:0 0 14px #f4a8386b!important;background:#120d05!important}
+.fx-assistant .chat-head div{padding-top:10px}
+.fx-assistant .chat-head b{font:italic 700 40px/.95 "Cormorant Garamond",Georgia,serif!important;color:#f1bf68!important}
+.fx-assistant .chat-head small{display:block!important;color:#e4c89a!important;font:400 13px/1.5 "DM Sans",sans-serif!important;margin-top:9px!important}
+.fx-assistant .chat-head small:before{content:"●";color:#49dc68;margin-right:7px;font-size:12px}
+.fx-assistant .chat-head button{border:1px solid #52402c!important;border-radius:50%!important;background:#201b16!important;color:#d9c7aa!important;min-width:29px;min-height:29px;font-size:15px!important}
+.fx-assistant .fx-chisa-illustration{display:none!important}
+.fx-assistant .messages{flex:0 0 auto!important;min-height:0!important;max-height:170px!important;overflow-y:auto!important;padding:9px 20px 16px!important;gap:9px!important;background:transparent!important}
+.fx-assistant .bubble{background:linear-gradient(110deg,#fff2df,#baa48b)!important;color:#211306!important;border:1px solid #fff0cc!important;border-radius:17px!important;font-size:13px!important;line-height:1.42!important;padding:14px 17px!important;max-width:100%!important}
+.fx-assistant .bubble.me{background:#51402b!important;color:#fff2d7!important;border-color:#a98450!important}
+.fx-assistant .fx-suggestion-label{display:none!important}
+.fx-assistant .quick{display:grid!important;grid-template-columns:1fr!important;gap:8px!important;padding:4px 20px 14px!important;max-height:none!important;flex:1!important;overflow-y:auto!important}
+.fx-assistant .quick button{white-space:nowrap!important;text-align:left!important;min-height:40px!important;padding:9px 18px!important;border:1px solid #8e6636!important;border-radius:999px!important;background:linear-gradient(120deg,#382a1a,#0c0c0b 80%,#342515)!important;color:#f5ebda!important;font:500 13px/1.2 "DM Sans",sans-serif!important;box-shadow:inset 0 1px 9px #d09a3118!important}
+.fx-assistant .quick button:hover{background:#5a3b16!important;border-color:#ffd48b!important}
+.fx-assistant .ask{margin-top:auto!important;flex:0 0 auto!important;background:transparent!important;border:1px solid #da9a41!important;border-radius:14px!important;box-shadow:0 0 13px #d69d4266!important;padding:7px!important;margin:8px 14px 16px!important}
+.fx-assistant .ask input{background:transparent!important;border:0!important;color:#fff4d9!important;font-size:12px!important;border-radius:9px!important}
+.fx-assistant .ask input::placeholder{color:#d3bc94!important}
+.fx-assistant .ask button{border-radius:10px!important;background:linear-gradient(140deg,#fff1bc,#db9d42)!important;color:#1e1203!important;font-size:20px!important;box-shadow:0 0 8px #f4b95d72!important;min-width:43px}
+.fx-assistant .no-ai{font:400 10px/1.3 "DM Sans",sans-serif!important;color:#ae9571!important;background:transparent!important;padding:0 15px 10px!important}
+.fx-assistant .chat-fab{display:none!important}
+.fx-neon-dashboard .workspace{background:linear-gradient(135deg,#17120b,#090909)!important;border:1px solid #896637!important;color:#f4ead5!important}
+.fx-neon-dashboard .workspace .main{background:#0c0c0c!important}
+.fx-neon-dashboard .workspace .tools{background:#14110c!important;border-color:#664622!important}
+.fx-neon-dashboard .workspace .tools .tool{color:#f3ddae!important}
+.fx-neon-dashboard .workspace .tools .tool i{color:#f2bf63!important}
+.fx-neon-dashboard .fx-file-toolbar{background:#1d150c!important;border-color:#a5742c!important;color:#ffdb94!important}
+.fx-neon-dashboard .fx-file-toolbar button,.fx-neon-dashboard .fx-edit-tools button{background:#261c0e!important;color:#efc77a!important;border-color:#956d2b!important}
+.fx-neon-dashboard .fx-file-toolbar .fx-save{background:linear-gradient(120deg,#f8d68f,#ae7222)!important;color:#170d05!important}
+.fx-neon-dashboard .viewer{background:#111!important}
+.fx-neon-dashboard .fox-advanced{background:#19140d!important;border-color:#c08e4a!important}
+.fx-neon-dashboard .fox-adv-grid button{background:#241b11!important;border-color:#79572b!important;color:#f4d69a!important}
+.fx-neon-dashboard .fox-privacy{background:#2f2316!important}
+body.fx-neon-dashboard .fx-mode-editor .fx-recent{display:none}
+@media(max-width:1540px){:root{--fx-rail:211px;--fx-help:374px}.fx-brand{min-width:315px!important}.fx-brand strong{font-size:32px!important}.fx-top-nav{gap:5px!important}.fx-top-nav button{padding:9px 10px!important}.fx-tool-grid button{min-height:125px!important}.fx-tool-grid button i{font-size:31px!important}.fx-hero-content{max-width:64%!important}.fx-home-hero h1{font-size:55px!important}.fx-assistant .chat-head b{font-size:34px!important}.fx-assistant .chat-head img{height:77px!important;width:77px!important}.fx-rail button{font-size:12px!important}.fx-assistant .quick button{font-size:11px!important;padding:8px 12px!important}.fx-assistant .messages{max-height:145px!important}}
+@media(max-width:1160px){:root{--fx-rail:197px;--fx-help:0px}.fx-neon-dashboard .shell{margin-right:0!important}.fx-assistant.chat-widget{position:fixed!important;top:auto!important;bottom:12px!important;right:12px!important;width:min(390px,calc(100vw - 24px))!important;height:auto!important;max-height:calc(100dvh - 70px)!important;overflow:visible!important}.fx-assistant .chat-panel{max-height:min(600px,calc(100dvh - 125px))!important;min-height:0!important;height:min(600px,calc(100dvh - 125px))!important;background:#100e0a!important;border-radius:20px!important}.fx-assistant .chat-fab{display:block!important;width:68px!important;height:68px!important;float:right;box-shadow:0 0 15px #e3a64f!important;border:3px solid #f3c979!important}.fx-assistant .chat-head{min-height:100px!important}.fx-assistant .quick{max-height:220px!important}.fx-assistant.chat-widget:has(.chat-panel[hidden]){background:transparent!important;border-color:transparent!important;box-shadow:none!important}.fx-assistant .chat-panel[hidden]{display:none!important}.fx-assistant .chat-panel:not([hidden])+.fox-chat-hint{display:none!important}}
+@media(max-width:790px){:root{--fx-rail:0px;--fx-top:65px}.fx-neon-dashboard .site-nav.fx-top{height:auto!important;min-height:65px!important;padding:8px 10px!important;gap:8px!important}.fx-brand{min-width:158px!important}.fx-brand strong{font-size:25px!important}.fx-brand svg{width:38px!important;height:38px!important}.fx-brand small{font-size:9px!important}.fx-top-nav{gap:3px!important}.fx-top-nav button{padding:8px!important;font-size:11px!important}.fx-rail{position:relative!important;top:auto!important;left:auto!important;bottom:auto!important;width:100%!important;height:54px!important;max-height:54px!important;flex-direction:row!important;overflow-x:auto!important;overflow-y:hidden!important;padding:6px!important}.fx-rail button{white-space:nowrap!important;min-height:40px!important;font-size:11px!important}.fx-rail-landscape{display:none!important}.fx-neon-dashboard .shell{margin:0!important;padding:9px 9px 100px!important}.fx-home-hero{height:250px!important;min-height:250px!important}.fx-hero-content{padding:14px 10px 14px 14px!important}.fx-home-hero h1{font-size:45px!important}.fx-home-hero p{font-size:12px!important;max-width:270px!important}.fx-hero-buttons button{min-width:0!important;font-size:12px!important}.fx-tool-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}.fx-tool-grid button{min-height:112px!important}.fx-tool-grid button b{font-size:12px!important}.fx-recent-row{grid-template-columns:1fr!important}.fx-assistant.chat-widget{z-index:101!important}}
+@media(max-width:540px){.fx-top-nav #fxTopBatch,.fx-top-nav #fxTopCloud{display:none!important}.fx-home-hero{min-height:260px!important;height:auto!important}.fx-home-hero:before{right:-30%!important;opacity:.37!important;width:105%!important}.fx-hero-content{max-width:100%!important;width:100%!important;padding:18px!important}.fx-home-hero h1{font-size:43px!important}.fx-home-hero p{max-width:78%!important}.fx-hero-buttons{flex-wrap:wrap!important}.fx-tool-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.fx-tool-grid button{min-height:111px!important}.fx-recent{padding:11px!important;margin:12px 0 0!important}.fx-assistant .chat-head b{font-size:29px!important}.fx-assistant .quick{gap:5px!important}.fx-assistant .quick button{font-size:11px!important}}
+@media(prefers-reduced-motion:reduce){.fx-tool-grid button:hover{transform:none!important}}
