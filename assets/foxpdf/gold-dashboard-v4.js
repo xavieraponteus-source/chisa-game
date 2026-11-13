@@ -8,7 +8,7 @@ ready(function(){
 const app=window.FoxPDFBridge;
 if(!app){console.warn("FoxPDF visual UI: PDF bridge unavailable; keeping original layout.");return}
 const $=(id)=>document.getElementById(id);
-const avatar="https://xavieraponteus-source.github.io/chisa-game/assets/foxpdf/gold-fox-avatar.svg";
+const avatar="https://xavieraponteus-source.github.io/chisa-game/assets/foxpdf/chisa-helper-v2.webp";
 const logo='<img class="fx-art-fox-logo" loading="eager" src="https://xavieraponteus-source.github.io/chisa-game/assets/foxpdf/ai-fox-mask-gold-v5.svg" alt="FoxPDF gold fox mask logo" width="69" height="66">';
 const oldHeader=document.querySelector("header.site-nav");
 const easy=$("easyMode");
