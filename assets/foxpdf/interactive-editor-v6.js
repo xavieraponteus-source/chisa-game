@@ -226,6 +226,77 @@ const mini=el("aside","fxie-mini-pages");mini.id="fxieThumbnails";mini.hidden=tr
 
 /* Local-first visual page organizer: drag, add, delete, duplicate, move, rotate */
 let thumbnailLoad=0,selectedThumb=1,draggedThumb=0,thumbReader=null,thumbObserver=null,thumbRefreshTimer=null,organizerBusy=false,deletePending=false,splitPage=0;
+let touchDrag=null,touchDragTimer=null,touchGhost=null,touchDrop=null;
+function clearTouchDrag(){
+ if(touchDragTimer){clearTimeout(touchDragTimer);touchDragTimer=null}
+ if(touchGhost){touchGhost.remove();touchGhost=null}
+ mini.querySelectorAll(".fxie-touch-dragging,.fxie-drop-before,.fxie-drop-after").forEach(e=>e.classList.remove("fxie-touch-dragging","fxie-drop-before","fxie-drop-after"));
+ touchDrag=null;touchDrop=null;
+}
+function dragOrder(from,to,after){
+ const count=loadedPageCount();
+ if(!Number.isInteger(from)||from<1||from>count||!Number.isInteger(to)||to<1||to>count)return null;
+ const items=Array.from({length:count},(_,i)=>i+1).filter(n=>n!==from);
+ const pos=items.indexOf(to);
+ if(pos<0)return null;
+ items.splice(pos+(after?1:0),0,from);
+ return items.indexOf(from)+1;
+}
+function touchTarget(x,y){
+ if(!touchDrag)return null;
+ const hit=document.elementFromPoint(x,y);
+ const tile=hit?.closest?.(".fxie-thumb-tile");
+ if(!tile||!mini.contains(tile))return null;
+ const rect=tile.getBoundingClientRect();
+ return{page:Number(tile.dataset.pageIndex),after:y>rect.top+rect.height/2,tile};
+}
+function moveTouchGhost(x,y){
+ if(!touchGhost)return;
+ touchGhost.style.transform="translate3d("+(x-34)+"px,"+(y-27)+"px,0)";
+ const list=mini.querySelector(".fxie-mini-list");
+ if(list){
+  const bounds=mini.getBoundingClientRect();
+  if(y<bounds.top+65)mini.scrollTop-=Math.min(22,Math.ceil((bounds.top+65-y)/3));
+  if(y>bounds.bottom-48)mini.scrollTop+=Math.min(22,Math.ceil((y-bounds.bottom+48)/3));
+ }
+ const hit=touchTarget(x,y);
+ mini.querySelectorAll(".fxie-drop-before,.fxie-drop-after").forEach(e=>e.classList.remove("fxie-drop-before","fxie-drop-after"));
+ touchDrop=hit;
+ if(hit&&hit.page!==touchDrag.page)hit.tile.classList.add(hit.after?"fxie-drop-after":"fxie-drop-before");
+}
+function startTouchDrag(tile,handle,event){
+ if(!("PointerEvent" in window))return;
+ if(event.pointerType!=="touch"&&event.pointerType!=="pen")return;
+ if(organizerBusy)return;
+ if(touchDrag)clearTouchDrag();
+ const page=Number(tile.dataset.pageIndex);
+ touchDrag={page,pointerId:event.pointerId,active:false,handle,x:event.clientX,y:event.clientY};
+ // Dragging starts immediately on the dedicated handle, while swiping thumbnails scrolls normally.
+ event.preventDefault();
+ handle.setPointerCapture(event.pointerId);
+ handle.classList.add("fxie-touch-pressed");
+ const ghost=el("div","fxie-touch-ghost","Page "+page+"   ⋮⋮");
+ ghost.setAttribute("aria-hidden","true");
+ document.body.append(ghost);touchGhost=ghost;
+ tile.classList.add("fxie-touch-dragging");
+ touchDrag.active=true;
+ moveTouchGhost(event.clientX,event.clientY);
+ if(navigator.vibrate)try{navigator.vibrate(12)}catch(_){}
+}
+function endTouchDrag(event,commit){
+ if(!touchDrag||touchDrag.pointerId!==event.pointerId)return;
+ const state=touchDrag;
+ const target=touchDrop;
+ const handle=state.handle;
+ if(handle?.hasPointerCapture?.(event.pointerId))try{handle.releasePointerCapture(event.pointerId)}catch(_){}
+ handle?.classList.remove("fxie-touch-pressed");
+ clearTouchDrag();
+ if(commit&&target&&target.page!==state.page){
+  const destination=dragOrder(state.page,target.page,target.after);
+  if(destination!==null&&destination!==state.page)moveThumbnail(state.page,destination);
+ }else if(commit){chooseThumbnail(state.page,false)}
+}
+
 const thumbsInput=el("input");thumbsInput.type="file";thumbsInput.accept=".pdf,application/pdf";thumbsInput.multiple=true;thumbsInput.hidden=true;mini.append(thumbsInput);
 const organizeState=()=>app.current();
 const loadedPageCount=()=>organizeState()?.pages||0;
@@ -359,13 +430,14 @@ thumbsInput.addEventListener("change",async e=>{
 async function renderThumbnails(){
  const d=app.current();if(!d||mini.hidden)return;
  const token=++thumbnailLoad;
+ clearTouchDrag();
  if(thumbObserver)thumbObserver.disconnect();
  if(thumbReader){try{thumbReader.destroy()}catch(_){}thumbReader=null}
  selectedThumb=Math.max(1,Math.min(d.pages,selectedThumb||d.page));
  mini.replaceChildren();mini.append(thumbsInput);
  const header=el("div","fxie-organizer-head");
  header.append(el("h3","","Organize Pages"),el("p","","Drag pages to reorder. Tap a page to select."));
- mini.append(header);
+ mini.append(header);header.append(el("p","fxie-touch-tip","On phones: drag using the ⋮⋮ handle, or use ↑ / ↓ below."));
  const actions=el("div","fxie-organizer-actions");
  const control=(text,fn,title)=>{
   const b=el("button","fxie-organizer-action",text);b.type="button";b.title=title||text;b.addEventListener("click",fn);actions.append(b);return b
@@ -397,6 +469,22 @@ async function renderThumbnails(){
   tile.append(preview,footer);list.append(tile);nodes.push({tile,preview,image,placeholder});
   preview.onclick=()=>chooseThumbnail(i,true);
   preview.addEventListener("keydown",e=>{
+   if(e.key==="ArrowUp"||e.key==="ArrowDown"){
+    e.preventDefault();moveThumbnail(i,Math.max(1,Math.min(d.pages,i+(e.key==="ArrowUp"?-1:1))));
+   }
+  });
+  // iPhone/iPad/Android: dedicated large drag handle keeps normal thumbnail scrolling intact.
+  handle.setAttribute("role","button");handle.tabIndex=0;
+  handle.setAttribute("aria-label","Drag page "+i+" to reorder");
+  handle.addEventListener("pointerdown",e=>startTouchDrag(tile,handle,e));
+  handle.addEventListener("pointermove",e=>{
+   if(!touchDrag||touchDrag.pointerId!==e.pointerId||!touchDrag.active)return;
+   e.preventDefault();moveTouchGhost(e.clientX,e.clientY);
+  });
+  handle.addEventListener("pointerup",e=>endTouchDrag(e,true));
+  handle.addEventListener("pointercancel",e=>endTouchDrag(e,false));
+  handle.addEventListener("lostpointercapture",e=>{if(touchDrag?.pointerId===e.pointerId)endTouchDrag(e,false)});
+  handle.addEventListener("keydown",e=>{
    if(e.key==="ArrowUp"||e.key==="ArrowDown"){
     e.preventDefault();moveThumbnail(i,Math.max(1,Math.min(d.pages,i+(e.key==="ArrowUp"?-1:1))));
    }
@@ -460,6 +548,7 @@ function toggleOrganizer(){
  else{thumbnailLoad++;thumbObserver?.disconnect();thumbReader?.destroy?.();thumbReader=null}
 }
 bind("fxiePages",toggleOrganizer);
+window.addEventListener("blur",clearTouchDrag);
 
 bind("fxiePanelDone",()=>view.classList.add("fxie-drawer-closed"));bind("fxieRotate",()=>app.click("rotate"));bind("fxieAddPage",()=>app.click("blankPage"));bind("fxieDelete",()=>app.click("delete"));
 bind("fxiePrev",()=>{const d=app.current();if(d)app.setPage(Math.max(1,d.page-1))});bind("fxieNext",()=>{const d=app.current();if(d)app.setPage(Math.min(d.pages,d.page+1))});
