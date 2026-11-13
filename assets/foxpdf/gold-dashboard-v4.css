@@ -135,3 +135,7 @@ body.fx-neon-dashboard .fx-mode-editor .fx-recent{display:none}
 .fx-assistant .chat-head img{border-color:#efc777!important}
 @media(max-width:1540px){.fx-brand{min-width:305px!important}.fx-brand .fx-art-fox-logo{width:64px!important;height:55px!important}}
 @media(max-width:790px){.fx-brand{min-width:155px!important}.fx-brand .fx-art-fox-logo{width:42px!important;height:38px!important;margin-left:-3px!important}}
+
+/* FOX_CHISA_GOLD_PORTRAIT_V1 */
+.fx-assistant .chat-head img{object-fit:cover!important;filter:sepia(.32) saturate(1.07) contrast(1.09)!important;border-color:#f4c87b!important;box-shadow:0 0 15px #e5b05b65!important}
+.fx-assistant .fx-chisa-illustration img{filter:sepia(.3) saturate(1.05)!important}
