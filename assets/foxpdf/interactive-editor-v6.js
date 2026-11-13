@@ -9,7 +9,7 @@ const el=(tag,cls,text)=>{const a=document.createElement(tag);if(cls)a.className
 const view=el("div","fxie-root");view.id="fxInteractiveEditor";
 view.innerHTML=[
 '<header class="fxie-topbar"><div class="fxie-tabs"><strong class="fxie-pdf">PDF</strong><button id="fxieHome">⌂ Home</button><button id="fxieTools">Tools</button><button class="selected">Edit</button><button id="fxieOrganize">Organize</button><button id="fxieConvert">Convert</button><button id="fxieSign">E-Sign</button></div><div class="fxie-filename" id="fxieFilename">PDF Editor</div><div class="fxie-topright"><button id="fxiePrint" title="Print">⎙</button><button id="fxieShare">Share</button><button id="fxieSave" class="fxie-primary">⇩ Save PDF</button></div></header>',
-'<div class="fxie-layout"><aside class="fxie-left"><div class="fxie-lefthead"><h2>Edit</h2><button id="fxieInfo" title="About editing">⚙</button></div>',
+'<div class="fxie-layout"><aside class="fxie-left"><div class="fxie-lefthead"><h2>Edit</h2><div><button id="fxiePanelDone" class="fxie-paneldone" type="button">Done</button><button id="fxieInfo" title="About editing">⚙</button></div></div>',
 '<p class="fxie-label">EDIT CONTENT</p><button class="fxie-tool selected" data-mode="select"><i>↖</i> Select text</button><button class="fxie-tool" data-mode="edit"><i>✎</i> Edit existing text</button>',
 '<p class="fxie-label">ADD CONTENT</p><button class="fxie-tool" data-mode="text"><i>T</i> Text</button><button class="fxie-tool" data-mode="image"><i>▧</i> Image</button><button class="fxie-tool" data-mode="highlight"><i>▰</i> Highlight</button><button class="fxie-tool" id="fxieComments"><i>☏</i> Comments & annotations</button>',
 '<p class="fxie-label">TEXT FORMAT</p><div class="fxie-controls"><label>Font<select id="fxieFont"><option value="Helvetica">Helvetica</option><option value="TimesRoman">Times New Roman</option><option value="Courier">Courier</option></select></label><div class="fxie-two"><label>Size<input type="number" id="fxieSize" min="5" max="80" value="14"></label><label>Color<input type="color" id="fxieColor" value="#172846"></label></div></div>',
@@ -25,7 +25,7 @@ main.append(view);
 let mode="select",zoom="fit",renderVersion=0,rendered=null,selected=null,inspectCache=null,consentKey="",undo=[],redo=[],historyName="",pendingImage=null,drawing=null,lastPdf=null;
 const say=(message,bad=false)=>{const s=$("fxieStatus");s.textContent=message;s.dataset.bad=bad?"1":"0"};
 function check(){const d=app.current();if(!d){app.say("Please open a PDF first.");app.open();return null}return d}
-function setMode(m){mode=m;view.dataset.mode=m;selected=null;$("fxieReplaceBox").hidden=true;$("fxieInsertBox").hidden=m!=="text";for(const b of view.querySelectorAll("[data-mode]"))b.classList.toggle("selected",b.dataset.mode===m);for(const [id,key] of [["fxieSelect","select"],["fxieText","text"],["fxieImage","image"],["fxieHighlight","highlight"]])$(id).classList.toggle("selected",m===key);
+function setMode(m){mode=m;view.classList.remove("fxie-drawer-closed");view.dataset.mode=m;selected=null;$("fxieReplaceBox").hidden=true;$("fxieInsertBox").hidden=m!=="text";for(const b of view.querySelectorAll("[data-mode]"))b.classList.toggle("selected",b.dataset.mode===m);for(const [id,key] of [["fxieSelect","select"],["fxieText","text"],["fxieImage","image"],["fxieHighlight","highlight"]])$(id).classList.toggle("selected",m===key);
 say(({select:"Select a text region on the page.",edit:"Click existing text to edit its paragraph.",text:"Enter text on the left, then click the page.",image:"Choose a picture, then click where it should go.",highlight:"Drag across a region on the page."})[m]);if(m==="image"&&!pendingImage)$("fxieImageFile").click()}
 async function getJs(){if(window.pdfjsLib)return window.pdfjsLib;if(!window.fxieJS)window.fxieJS=new Promise((resolve,reject)=>{const script=document.createElement("script");script.src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";script.onload=()=>{if(!window.pdfjsLib)return reject(Error("PDF renderer not found"));pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";resolve(pdfjsLib)};script.onerror=()=>reject(Error("PDF renderer could not load"));document.head.append(script)});return window.fxieJS}
 function point(e){if(!rendered)return null;const r=rendered.canvas.getBoundingClientRect();if(!r.width||!r.height)return null;return{x:(e.clientX-r.left)/r.width*rendered.w,y:(e.clientY-r.top)/r.height*rendered.h}}
@@ -101,7 +101,26 @@ bind("fxieHome",()=>$("fxTopHome")?.click());bind("fxieTools",()=>window.FoxPDFP
 bind("fxieSave",()=>app.save());bind("fxieShare",()=>window.FoxPDFReviews?.share());bind("fxiePrint",()=>window.FoxPDFPro?.open("print"));
 bind("fxieAdvanced",()=>window.FoxPDFPro?window.FoxPDFPro.open("tools"):say("Advanced tools are loading. Please try again.",true));bind("fxieChisa",()=>{$("chat").hidden=false});bind("fxieComments",()=>window.FoxPDFPro?.open("annotate"));
 bind("fxieSearch",()=>window.FoxPDFPro?.open("search"));bind("fxieProperties",()=>window.FoxPDFPro?.open("metadata"));bind("fxieMarkup",()=>window.FoxPDFPro?.open("annotate"));
-bind("fxiePages",()=>document.body.classList.toggle("fxie-show-thumbnails"));bind("fxieRotate",()=>app.click("rotate"));bind("fxieAddPage",()=>app.click("blankPage"));bind("fxieDelete",()=>app.click("delete"));
+const mini=el("aside","fxie-mini-pages");mini.id="fxieThumbnails";mini.hidden=true;$("fxieScroll").prepend(mini);
+let thumbnailLoad=0;
+async function renderThumbnails(){
+ const d=app.current();if(!d)return;const token=++thumbnailLoad;
+ mini.replaceChildren();mini.append(el("h3","","Pages"));
+ const items=el("div","fxie-mini-list");mini.append(items);
+ const js=await getJs();const reader=await js.getDocument({data:app.bytes().slice(0)}).promise;
+ try{for(let i=0;i<Math.min(d.pages,45);i++){
+ if(token!==thumbnailLoad)return;
+ const button=el("button","fxie-mini-page");button.type="button";
+ if(d.page===i+1)button.classList.add("selected");
+ const figure=el("canvas","fxie-mini-canvas"),caption=el("span","",String(i+1));button.append(figure,caption);button.onclick=()=>{app.setPage(i+1);mini.hidden=true};
+ items.append(button);
+ const page=await reader.getPage(i+1),viewport=page.getViewport({scale:.18});
+ figure.width=Math.ceil(viewport.width);figure.height=Math.ceil(viewport.height);
+ await page.render({canvasContext:figure.getContext("2d"),viewport}).promise;
+ }}finally{reader.destroy?.()}
+}
+bind("fxiePages",()=>{mini.hidden=!mini.hidden;if(!mini.hidden)renderThumbnails().catch(e=>say("Could not load thumbnails: "+e.message,true))});
+bind("fxiePanelDone",()=>view.classList.add("fxie-drawer-closed"));bind("fxieRotate",()=>app.click("rotate"));bind("fxieAddPage",()=>app.click("blankPage"));bind("fxieDelete",()=>app.click("delete"));
 bind("fxiePrev",()=>{const d=app.current();if(d)app.setPage(Math.max(1,d.page-1))});bind("fxieNext",()=>{const d=app.current();if(d)app.setPage(Math.min(d.pages,d.page+1))});
 $("fxieZoom").onchange=e=>{zoom=e.target.value;draw()};
 function currentZoom(){return zoom==="fit"?(rendered?.scale||1):Number(zoom)}
