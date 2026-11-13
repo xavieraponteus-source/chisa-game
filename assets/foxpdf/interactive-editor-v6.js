@@ -99,7 +99,7 @@ const bind=(id,fn)=>{$(id).onclick=fn};
 bind("fxieSelect",()=>setMode("select"));bind("fxieText",()=>setMode("text"));bind("fxieImage",()=>setMode("image"));bind("fxieHighlight",()=>setMode("highlight"));
 bind("fxieHome",()=>$("fxTopHome")?.click());bind("fxieTools",()=>window.FoxPDFPro?.open("tools"));bind("fxieOrganize",()=>app.click("reorder"));bind("fxieConvert",()=>app.advanced("convert"));bind("fxieSign",()=>window.FoxPDFReviews?.sign());
 bind("fxieSave",()=>app.save());bind("fxieShare",()=>window.FoxPDFReviews?.share());bind("fxiePrint",()=>window.FoxPDFPro?.open("print"));
-bind("fxieAdvanced",()=>{app.click("advancedToggle");say("Advanced tools are below the editor in your document workspace.")});bind("fxieChisa",()=>{$("chat").hidden=false});bind("fxieComments",()=>window.FoxPDFPro?.open("annotate"));
+bind("fxieAdvanced",()=>window.FoxPDFPro?window.FoxPDFPro.open("tools"):say("Advanced tools are loading. Please try again.",true));bind("fxieChisa",()=>{$("chat").hidden=false});bind("fxieComments",()=>window.FoxPDFPro?.open("annotate"));
 bind("fxieSearch",()=>window.FoxPDFPro?.open("search"));bind("fxieProperties",()=>window.FoxPDFPro?.open("metadata"));bind("fxieMarkup",()=>window.FoxPDFPro?.open("annotate"));
 bind("fxiePages",()=>document.body.classList.toggle("fxie-show-thumbnails"));bind("fxieRotate",()=>app.click("rotate"));bind("fxieAddPage",()=>app.click("blankPage"));bind("fxieDelete",()=>app.click("delete"));
 bind("fxiePrev",()=>{const d=app.current();if(d)app.setPage(Math.max(1,d.page-1))});bind("fxieNext",()=>{const d=app.current();if(d)app.setPage(Math.min(d.pages,d.page+1))});
@@ -112,6 +112,11 @@ bind("fxieRedo",async()=>{if(!redo.length)return say("Nothing to redo.");const d
 bind("fxieInfo",()=>alert("The FoxPDF editor renders pages and selectable text blocks. Original paragraph editing uses guarded server processing and may reject font-complex layouts. Permanent redaction is a separate, secure operation."));
 window.addEventListener("foxpdf:change",()=>{const d=app.current();if(d){$("fxieFilename").textContent=d.name;$("fxieCount").textContent=d.page+" / "+d.pages;if(historyName!==d.name){undo=[];redo=[];historyName=d.name}}if(document.body.classList.contains("fx-mode-editor"))requestAnimationFrame(draw)});
 let active=false;new MutationObserver(()=>{const now=document.body.classList.contains("fx-mode-editor");if(now!==active){active=now;if(now)requestAnimationFrame(draw)}}).observe(document.body,{attributes:true,attributeFilter:["class"]});
+window.FoxPDFInteractiveEditor={
+ open:(newMode="select")=>{if(!app.current()){app.open();return;}const button=document.querySelector('.fx-rail [data-fx="edit"]');if(button)button.click();setMode(newMode)},
+ setMode,
+ refresh:draw
+};
 if(app.current()){$("fxieFilename").textContent=app.current().name}
 });
 })();
