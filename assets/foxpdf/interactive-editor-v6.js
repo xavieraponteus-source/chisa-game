@@ -8,25 +8,25 @@ const $=id=>document.getElementById(id);
 const el=(tag,cls,text)=>{const a=document.createElement(tag);if(cls)a.className=cls;if(text!==undefined)a.textContent=text;return a};
 const view=el("div","fxie-root");view.id="fxInteractiveEditor";
 view.innerHTML=[
-'<header class="fxie-topbar"><div class="fxie-tabs"><strong class="fxie-pdf">PDF</strong><button id="fxieHome">⌂ Home</button><button id="fxieTools">Tools</button><button class="selected">Edit</button><button id="fxieOrganize">Organize</button><button id="fxieConvert">Convert</button><button id="fxieSign">E-Sign</button></div><div class="fxie-filename" id="fxieFilename">PDF Editor</div><div class="fxie-topright"><button id="fxiePrint" title="Print">⎙</button><button id="fxieShare">Share</button><button id="fxieSave" class="fxie-primary">⇩ Save PDF</button></div></header>',
+'<header class="fxie-topbar"><div class="fxie-tabs"><strong class="fxie-pdf">PDF</strong><button id="fxieHome">⌂ Home</button><button id="fxieTools">Tools</button><button class="selected">Edit</button><button id="fxieOrganize">Organize</button><button id="fxieConvert">Convert</button><button id="fxieSign">E-Sign</button></div><div class="fxie-filename" id="fxieFilename">PDF Editor</div><div class="fxie-topright"><button id="fxiePrint" title="Print">⎙</button><button id="fxieDrawSignature" title="Handwrite a visible signature">✍ Draw Signature</button><button id="fxieDigitalSign" class="fxie-sign-primary" title="Cryptographically sign a PDF with a certificate">✦ Digital Signature</button><button id="fxieShare">Share</button><button id="fxieSave" class="fxie-primary">⇩ Save PDF</button></div></header>',
 '<div class="fxie-layout"><aside class="fxie-left"><div class="fxie-lefthead"><h2>Edit</h2><div><button id="fxiePanelDone" class="fxie-paneldone" type="button">Done</button><button id="fxieInfo" title="About editing">⚙</button></div></div>',
 '<p class="fxie-label">EDIT CONTENT</p><button class="fxie-tool selected" data-mode="select"><i>↖</i> Select text</button><button class="fxie-tool" data-mode="edit"><i>✎</i> Edit existing text</button>',
-'<p class="fxie-label">ADD CONTENT</p><button class="fxie-tool" data-mode="text"><i>T</i> Text</button><button class="fxie-tool" data-mode="image"><i>▧</i> Image</button><button class="fxie-tool" data-mode="highlight"><i>▰</i> Highlight</button><button class="fxie-tool" id="fxieComments"><i>☏</i> Comments & annotations</button>',
+'<p class="fxie-label">ADD CONTENT</p><button class="fxie-tool" data-mode="text"><i>T</i> Text</button><button class="fxie-tool" data-mode="image"><i>▧</i> Image</button><button class="fxie-tool" data-mode="highlight"><i>▰</i> Highlight</button><button class="fxie-tool" data-mode="draw"><i>✍</i> Draw / Handwrite</button><div class="fxie-ink-options"><label>Pen thickness <input id="fxiePenWidth" type="range" min="0.75" max="8" step="0.25" value="2.5"></label><span id="fxiePenLabel">2.5 pt</span></div><button class="fxie-tool" id="fxieComments"><i>☏</i> Comments & annotations</button>',
 '<p class="fxie-label">TEXT FORMAT</p><div class="fxie-controls"><label>Font<select id="fxieFont"><option value="Helvetica">Helvetica</option><option value="TimesRoman">Times New Roman</option><option value="Courier">Courier</option></select></label><div class="fxie-two"><label>Size<input type="number" id="fxieSize" min="5" max="80" value="14"></label><label>Color<input type="color" id="fxieColor" value="#172846"></label></div></div>',
 '<div class="fxie-editbox" id="fxieReplaceBox" hidden><p class="fxie-label">SELECTED PARAGRAPH</p><label>Paragraph<select id="fxieParagraph"></select></label><label>Replacement text<textarea id="fxieReplacement" rows="5"></textarea></label><p class="fxie-caution">Local visual editing stays on your device; the original text may still be recoverable or searchable. Advanced reflow uses a temporary PDF upload over HTTPS to FoxPDF Railway without additional popups. Review the result before saving. For sensitive information use Permanent Redaction.</p><button id="fxieApply" class="fxie-primary">Apply local text edit</button><button id="fxieCloudReflow" class="fxie-advanced-reflow" type="button">Advanced reflow · uses Railway</button></div>',
 '<div class="fxie-editbox" id="fxieInsertBox" hidden><label>Text to insert<textarea id="fxieInsertText" rows="4">New text</textarea></label><p class="fxie-hint">Click on the PDF page to place your text.</p></div>',
 '<div class="fxie-bottom"><button id="fxieAdvanced">Advanced tools</button><button id="fxieChisa">Ask Chisa for help</button><p>For privacy-sensitive text, use Permanent Redaction instead of covering content.</p></div></aside>',
-'<section class="fxie-stage"><div class="fxie-editorbar"><div class="fxie-barleft"><button id="fxieUndo" title="Undo">↶</button><button id="fxieRedo" title="Redo">↷</button><span class="fxie-div"></span><button id="fxieSelect" class="selected" title="Select">↖</button><button id="fxieText" title="Add text">T</button><button id="fxieImage" title="Add image">▧</button><button id="fxieHighlight" title="Highlight">▰</button></div><div class="fxie-barright"><button id="fxiePrev" title="Previous page">‹</button><strong id="fxieCount">0 / 0</strong><button id="fxieNext" title="Next page">›</button><span class="fxie-div"></span><button id="fxieMinus">−</button><select id="fxieZoom" aria-label="Zoom"><option value="fit">Fit width</option><option value=".75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select><button id="fxiePlus">+</button></div></div>',
+'<section class="fxie-stage"><div class="fxie-editorbar"><div class="fxie-barleft"><button id="fxieUndo" title="Undo">↶</button><button id="fxieRedo" title="Redo">↷</button><span class="fxie-div"></span><button id="fxieSelect" class="selected" title="Select">↖</button><button id="fxieText" title="Add text">T</button><button id="fxieImage" title="Add image">▧</button><button id="fxieHighlight" title="Highlight">▰</button><button id="fxieDraw" title="Draw with mouse, touch, or stylus">✍ Draw</button></div><div class="fxie-barright"><button id="fxiePrev" title="Previous page">‹</button><strong id="fxieCount">0 / 0</strong><button id="fxieNext" title="Next page">›</button><span class="fxie-div"></span><button id="fxieMinus">−</button><select id="fxieZoom" aria-label="Zoom"><option value="fit">Fit width</option><option value=".75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select><button id="fxiePlus">+</button></div></div>',
 '<div class="fxie-scroll" id="fxieScroll"><div class="fxie-sheetwrap" id="fxieSheetWrap"><p class="fxie-start">Open a PDF to start editing</p></div></div><div class="fxie-status" id="fxieStatus" aria-live="polite">Ready to edit</div></section>',
 '<nav class="fxie-right" aria-label="Page actions"><button id="fxiePages" title="Page thumbnails">▤</button><button id="fxieRotate" title="Rotate page">↻</button><button id="fxieAddPage" title="Insert page">⊕</button><button id="fxieDelete" title="Delete page">⌫</button><hr><button id="fxieSearch" title="Search PDF">⌕</button><button id="fxieProperties" title="Document properties">▣</button><button id="fxieMarkup" title="Mark up PDF">✎</button></nav></div>',
 '<input id="fxieImageFile" type="file" accept="image/png,image/jpeg" hidden>'
 ].join("");
 main.append(view);
-let mode="select",zoom="fit",renderVersion=0,rendered=null,selected=null,inspectCache=null,consentKey="",undo=[],redo=[],historyName="",pendingImage=null,drawing=null,lastPdf=null;
+let mode="select",zoom="fit",renderVersion=0,rendered=null,selected=null,inspectCache=null,consentKey="",undo=[],redo=[],historyName="",pendingImage=null,drawing=null,lastPdf=null,inkStroke=null;
 const say=(message,bad=false)=>{const s=$("fxieStatus");s.textContent=message;s.dataset.bad=bad?"1":"0"};
 function check(){const d=app.current();if(!d){app.say("Please open a PDF first.");app.open();return null}return d}
-function setMode(m){mode=m;view.classList.remove("fxie-drawer-closed");view.dataset.mode=m;selected=null;$("fxieReplaceBox").hidden=true;$("fxieInsertBox").hidden=m!=="text";for(const b of view.querySelectorAll("[data-mode]"))b.classList.toggle("selected",b.dataset.mode===m);for(const [id,key] of [["fxieSelect","select"],["fxieText","text"],["fxieImage","image"],["fxieHighlight","highlight"]])$(id).classList.toggle("selected",m===key);
-say(({select:"Select a text region on the page.",edit:"Click existing text to edit its paragraph.",text:"Enter text on the left, then click the page.",image:"Choose a picture, then click where it should go.",highlight:"Drag across a region on the page."})[m]);if(m==="image"&&!pendingImage)$("fxieImageFile").click()}
+function setMode(m){mode=m;view.classList.remove("fxie-drawer-closed");view.dataset.mode=m;selected=null;$("fxieReplaceBox").hidden=true;$("fxieInsertBox").hidden=m!=="text";for(const b of view.querySelectorAll("[data-mode]"))b.classList.toggle("selected",b.dataset.mode===m);for(const [id,key] of [["fxieSelect","select"],["fxieText","text"],["fxieImage","image"],["fxieHighlight","highlight"],["fxieDraw","draw"]])$(id).classList.toggle("selected",m===key);
+say(({select:"Select a text region on the page.",edit:"Click existing text to edit its paragraph.",text:"Enter text on the left, then click the page.",image:"Choose a picture, then click where it should go.",highlight:"Drag across a region on the page.",draw:"Draw on the PDF using your finger, mouse, or stylus. Tap Save PDF afterward."})[m]);if(m==="image"&&!pendingImage)$("fxieImageFile").click()}
 async function getJs(){if(window.pdfjsLib)return window.pdfjsLib;if(!window.fxieJS)window.fxieJS=new Promise((resolve,reject)=>{const script=document.createElement("script");script.src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";script.onload=()=>{if(!window.pdfjsLib)return reject(Error("PDF renderer not found"));pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";resolve(pdfjsLib)};script.onerror=()=>reject(Error("PDF renderer could not load"));document.head.append(script)});return window.fxieJS}
 function point(e){if(!rendered)return null;const r=rendered.canvas.getBoundingClientRect();if(!r.width||!r.height)return null;return{x:(e.clientX-r.left)/r.width*rendered.w,y:(e.clientY-r.top)/r.height*rendered.h}}
 
@@ -74,6 +74,11 @@ try{
  overlay.addEventListener("pointerdown",e=>{if(mode!=="highlight")return;drawing={start:point(e),end:point(e)};overlay.setPointerCapture(e.pointerId)});
  overlay.addEventListener("pointermove",e=>{if(!drawing)return;drawing.end=point(e);drawHighlightPreview(overlay)});
  overlay.addEventListener("pointerup",e=>{if(!drawing)return;drawing.end=point(e);const drag=drawing;drawing=null;overlay.replaceChildren();applyHighlight(drag)});
+ overlay.addEventListener("pointerdown",startInk);
+ overlay.addEventListener("pointermove",moveInk);
+ overlay.addEventListener("pointerup",finishInk);
+ overlay.addEventListener("pointercancel",cancelInk);
+
  const pageFrame=$("fxieSheetWrap");
  if(splitPage){
   const caption=el("div","fxie-left-spread-head","Page "+d.page+" · current");
@@ -93,6 +98,68 @@ $("fxieImageFile").onchange=async e=>{const f=e.target.files?.[0];e.target.value
 async function placeImage(p){if(!p||!check())return;if(!pendingImage)return $("fxieImageFile").click();await mutate(async pdf=>{const pg=pdf.getPage(app.current().page-1),img=pendingImage.type==="image/png"?await pdf.embedPng(pendingImage.bytes):await pdf.embedJpg(pendingImage.bytes),w=Math.min(200,img.width,pg.getWidth()*.45),h=w*img.height/img.width;pg.drawImage(img,{x:Math.max(0,Math.min(pg.getWidth()-w,p.x/rendered.scale)),y:Math.max(0,Math.min(pg.getHeight()-h,pg.getHeight()-p.y/rendered.scale-h)),width:w,height:h})},"Image inserted in PDF.")}
 function drawHighlightPreview(overlay){overlay.replaceChildren();const a=drawing.start,b=drawing.end;if(!a||!b)return;const square=el("div","fxie-highlight-box");Object.assign(square.style,{left:Math.min(a.x,b.x)+"px",top:Math.min(a.y,b.y)+"px",width:Math.abs(a.x-b.x)+"px",height:Math.abs(a.y-b.y)+"px"});overlay.append(square)}
 async function applyHighlight(t){if(!t.start||!t.end)return;const a=t.start,b=t.end,x=Math.min(a.x,b.x),y=Math.min(a.y,b.y),w=Math.abs(a.x-b.x),h=Math.abs(a.y-b.y);if(w<4||h<4)return;await mutate(async pdf=>{pdf.getPage(app.current().page-1).drawRectangle({x:x/rendered.scale,y:(rendered.h-y-h)/rendered.scale,width:w/rendered.scale,height:h/rendered.scale,color:PDFLib.rgb(1,.77,.22),opacity:.24})},"Highlighted region. For privacy use Permanent Redaction.")}
+
+
+/* Draw strokes into the actual PDF page. Pointer capture enables pens, fingers and mice. */
+function inkThickness(){return Math.max(.75,Math.min(8,Number($("fxiePenWidth")?.value)||2.5))}
+function startInk(event){
+ if(mode!=="draw"||!rendered||inkStroke)return;
+ if(event.pointerType==="mouse"&&event.button!==0)return;
+ const p=point(event);if(!p)return;
+ event.preventDefault();
+ try{event.currentTarget.setPointerCapture(event.pointerId)}catch(_){}
+ const overlay=event.currentTarget,canvas=el("canvas","fxie-ink-preview");
+ canvas.width=Math.max(1,Math.round(rendered.w*devicePixelRatio));
+ canvas.height=Math.max(1,Math.round(rendered.h*devicePixelRatio));
+ canvas.style.width=rendered.w+"px";canvas.style.height=rendered.h+"px";
+ canvas.style.pointerEvents="none";overlay.append(canvas);
+ const ctx=canvas.getContext("2d");
+ ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+ ctx.lineJoin="round";ctx.lineCap="round";
+ ctx.strokeStyle=$("fxieColor").value;ctx.fillStyle=$("fxieColor").value;
+ ctx.lineWidth=inkThickness()*rendered.scale;
+ ctx.beginPath();ctx.moveTo(p.x,p.y);
+ ctx.beginPath();ctx.arc(p.x,p.y,Math.max(.8,ctx.lineWidth/2),0,Math.PI*2);ctx.fill();
+ inkStroke={pointerId:event.pointerId,page:app.current().page,scale:rendered.scale,points:[p],overlay,canvas,ctx,thickness:inkThickness(),color:$("fxieColor").value};
+}
+function moveInk(event){
+ const state=inkStroke;if(!state||state.pointerId!==event.pointerId||mode!=="draw")return;
+ event.preventDefault();
+ const raw=typeof event.getCoalescedEvents==="function"?event.getCoalescedEvents():[event];
+ for(const one of raw){
+  const p=point(one);if(!p)continue;
+  const last=state.points[state.points.length-1];
+  if(Math.hypot(p.x-last.x,p.y-last.y)<.7)continue;
+  if(state.points.length>=1800)break;
+  state.ctx.beginPath();state.ctx.moveTo(last.x,last.y);state.ctx.lineTo(p.x,p.y);state.ctx.stroke();
+  state.points.push(p);
+ }
+}
+function cancelInk(event){
+ if(!inkStroke||inkStroke.pointerId!==event.pointerId)return;
+ const stroke=inkStroke;inkStroke=null;stroke.canvas.remove();
+}
+async function finishInk(event){
+ const state=inkStroke;if(!state||state.pointerId!==event.pointerId)return;
+ moveInk(event);inkStroke=null;
+ const pageNumber=state.page,points=state.points.slice(),thickness=state.thickness,paint=state.color;
+ state.canvas.remove();
+ if(!points.length||pageNumber!==app.current()?.page)return;
+ const hex=paint.replace("#",""),ink=PDFLib.rgb(parseInt(hex.slice(0,2),16)/255,parseInt(hex.slice(2,4),16)/255,parseInt(hex.slice(4,6),16)/255);
+ await mutate(async pdf=>{
+  const page=pdf.getPage(pageNumber-1);
+  if(page.getRotation().angle%360!==0)throw Error("Drawing directly on rotated PDF pages is not supported yet.");
+  const toPdf=p=>({x:p.x/state.scale,y:page.getHeight()-p.y/state.scale});
+  if(points.length===1){
+   const p=toPdf(points[0]);page.drawCircle({x:p.x,y:p.y,size:Math.max(.3,thickness/2),color:ink});return;
+  }
+  for(let i=1;i<points.length;i++){
+   const a=toPdf(points[i-1]),b=toPdf(points[i]);
+   page.drawLine({start:a,end:b,thickness,color:ink});
+  }
+ },"Drawing added to page "+pageNumber+". Choose Save PDF to download.");
+}
+$("fxiePenWidth").oninput=event=>{$("fxiePenLabel").textContent=Number(event.target.value).toFixed(1)+" pt"};
 
 /* Browser-local direct text appearance editing. Never automatically uploads documents. */
 let inlineEditor=null,localRevision=0;
@@ -240,8 +307,10 @@ $("fxieCloudReflow").onclick=async()=>{
 
 for(const b of view.querySelectorAll("[data-mode]"))b.onclick=()=>setMode(b.dataset.mode);
 const bind=(id,fn)=>{$(id).onclick=fn};
-bind("fxieSelect",()=>setMode("select"));bind("fxieText",()=>setMode("text"));bind("fxieImage",()=>setMode("image"));bind("fxieHighlight",()=>setMode("highlight"));
-bind("fxieHome",()=>$("fxTopHome")?.click());bind("fxieTools",()=>window.FoxPDFPro?.open("tools"));bind("fxieOrganize",()=>{if(mini.hidden)toggleOrganizer();else mini.scrollIntoView({block:"nearest"});});bind("fxieConvert",()=>app.advanced("convert"));bind("fxieSign",()=>window.FoxPDFReviews?.sign());
+bind("fxieSelect",()=>setMode("select"));bind("fxieText",()=>setMode("text"));bind("fxieImage",()=>setMode("image"));bind("fxieHighlight",()=>setMode("highlight"));bind("fxieDraw",()=>setMode("draw"));
+bind("fxieHome",()=>$("fxTopHome")?.click());bind("fxieTools",()=>window.FoxPDFPro?.open("tools"));bind("fxieOrganize",()=>{if(mini.hidden)toggleOrganizer();else mini.scrollIntoView({block:"nearest"});});bind("fxieConvert",()=>app.advanced("convert"));bind("fxieSign",()=>window.FoxPDFTaskPicker?.launch("sign"));
+bind("fxieDigitalSign",()=>window.FoxPDFTaskPicker?.launch("certificate"));
+bind("fxieDrawSignature",()=>window.FoxPDFTaskPicker?.launch("sign"));
 bind("fxieSave",()=>app.save());bind("fxieShare",()=>window.FoxPDFReviews?.share());bind("fxiePrint",()=>window.FoxPDFPro?.open("print"));
 bind("fxieAdvanced",()=>window.FoxPDFPro?window.FoxPDFPro.open("tools"):say("Advanced tools are loading. Please try again.",true));bind("fxieChisa",()=>window.FoxPDFChisaToggle?window.FoxPDFChisaToggle(true,true):$("chat").hidden=false);bind("fxieComments",()=>window.FoxPDFPro?.open("annotate"));
 bind("fxieSearch",()=>window.FoxPDFPro?.open("search"));bind("fxieProperties",()=>window.FoxPDFPro?.open("metadata"));bind("fxieMarkup",()=>window.FoxPDFPro?.open("annotate"));
@@ -767,7 +836,8 @@ window.addEventListener("resize",()=>{
  },140);
 },{passive:true});
 window.FoxPDFInteractiveEditor={
- open:(newMode="select")=>{if(!app.current()){app.open();return;}const button=document.querySelector('.fx-rail [data-fx="edit"]');if(button)button.click();setMode(newMode)},
+ open:(newMode="select")=>{if(!app.current()){window.FoxPDFTaskPicker?.launch(newMode==="draw"?"draw":"edit");return;}window.FoxPDFHomeNav?.showEditor();setMode(newMode)},
+ openPages:()=>toggleOrganizer(true),
  setMode,
  refresh:draw
 };
