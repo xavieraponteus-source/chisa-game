@@ -1,0 +1,55 @@
+/* FoxPDF Studio document chooser v13 */
+.fx-choice-open{overflow:hidden!important}
+.fx-choice-backdrop{position:fixed;z-index:20000;inset:0;display:flex;align-items:center;justify-content:center;overflow:auto;padding:16px;background:rgba(0,0,0,.76);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.fx-choice-modal{display:flex;flex-direction:column;width:min(580px,100%);max-height:min(94dvh,850px);overflow:hidden;border:1px solid #c79b50;border-radius:20px;background:linear-gradient(145deg,#181614,#0c0c0d 78%);box-shadow:0 22px 85px #000b,0 0 0 1px #d5b47130;color:#f8ebd7;font:14px/1.5 "DM Sans",system-ui,sans-serif}
+.fx-choice-header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:22px 21px 16px;border-bottom:1px solid #8e683875}
+.fx-choice-headings small{font-size:10px;font-weight:800;letter-spacing:1.6px;color:#e3b771}
+.fx-choice-headings h2{font:700 30px/1.1 "Cormorant Garamond",Georgia,serif;margin:5px 0 9px;color:#ffeac3}
+.fx-choice-headings p{color:#ddd0ba;font-size:13px;max-width:460px;margin:0}
+.fx-choice-close{min-width:43px;min-height:43px;padding:7px;background:#332b25;color:#f9e4ca;border:1px solid #9a7748;border-radius:11px;cursor:pointer;font-size:17px;touch-action:manipulation}
+.fx-choice-close:hover{background:#56412c}
+.fx-choice-content{padding:16px 20px 18px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.fx-choice-section h3{font-size:14px;font-weight:750;margin:0 0 10px;color:#f9e1ac}
+.fx-choice-files{display:flex;flex-direction:column;gap:8px;max-height:225px;overflow:auto;padding-right:4px}
+.fx-choice-empty{padding:18px 13px;border:1px dashed #8a6840;border-radius:11px;color:#d9cbb7;margin:0}
+.fx-choice-row{display:flex;align-items:center;gap:12px;min-height:63px;border:1px solid #68533d;background:#27221d;border-radius:11px;cursor:pointer;padding:9px 13px;color:#f5eee2;touch-action:manipulation}
+.fx-choice-row:has(input:checked){border-color:#e7b861;background:#41311f;box-shadow:inset 0 0 0 1px #c38e46}
+.fx-choice-row input{width:19px;height:19px;flex:0 0 19px;accent-color:#dbac5d}
+.fx-choice-file-icon{flex:0 0 38px;display:flex;justify-content:center;align-items:center;height:42px;border-radius:7px;color:#ffd28b;background:#694520;font-size:10px;font-weight:850;letter-spacing:.5px}
+.fx-choice-file-name{display:flex;flex-direction:column;gap:0;min-width:0}
+.fx-choice-file-name strong{font-size:13px;overflow-wrap:anywhere}
+.fx-choice-file-name small{color:#c0b4a4;font-size:11px}
+.fx-choice-upload{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-top:16px;padding:18px;border:1px dashed #c9a35e;border-radius:14px;background:#231b12}
+.fx-choice-upload.fx-choice-over{border-color:#f0d5a1;background:#45351e}
+.fx-choice-upload strong{font-size:15px;color:#f8e7c9}
+.fx-choice-upload p{font-size:12px;color:#d2c7b7;margin:0}
+.fx-choice-upload small{color:#b7a994;font-size:11px}
+.fx-choice-browse{min-height:46px;border:1px solid #dfb46b;border-radius:10px;padding:10px 18px;background:linear-gradient(115deg,#ffdf98,#cb933e);color:#21150b;font-weight:800;cursor:pointer;touch-action:manipulation}
+.fx-choice-footer{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:9px;margin-top:18px}
+.fx-choice-footer button,.fx-choice-sign-card{min-height:46px;border-radius:10px;cursor:pointer;padding:11px 16px;touch-action:manipulation}
+.fx-choice-cancel{background:#27231f;border:1px solid #8a6a45;color:#f5dfbd}
+.fx-choice-continue{background:linear-gradient(110deg,#ffe3a7,#cb9038);border:1px solid #ffe1a2;color:#241709;font-weight:850}
+.fx-choice-continue:disabled{filter:grayscale(.7);opacity:.45;cursor:not-allowed}
+.fx-choice-status{margin:0;padding:12px 20px 15px;border-top:1px solid #4c3a25;color:#d8c8b0;font-size:11px;min-height:35px}
+.fx-choice-status[data-error=true]{color:#ffafa3}
+.fx-choice-ready{display:flex;flex-direction:column;gap:3px;border:1px solid #906f44;border-radius:11px;padding:14px;margin-bottom:12px;background:#2d261d;color:#f9e4ba}
+.fx-choice-ready small{color:#d7c7b2}
+.fx-choice-input-label{display:flex;flex-direction:column;gap:7px;font-weight:750}
+.fx-choice-input-label input{padding:11px;font:inherit;color:#f8eee0;border:1px solid #9b7742;border-radius:9px;background:#2e2924;min-height:45px}
+.fx-choice-sign-options{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.fx-choice-sign-card{display:flex;flex-direction:column;gap:9px;text-align:left;background:#2e251c;border:1px solid #b18a52;color:#f8d8a1}
+.fx-choice-sign-card strong{font-size:16px;line-height:1.25}
+.fx-choice-sign-card small{color:#d1c1ac;font-size:12px;line-height:1.45}
+.fx-choice-sign-card:hover{background:#493420}
+@media(max-width:640px){
+ .fx-choice-backdrop{padding:8px;align-items:flex-end}
+ .fx-choice-modal{max-height:92dvh;border-radius:18px 18px 12px 12px}
+ .fx-choice-header{padding:16px 14px 12px}
+ .fx-choice-headings h2{font-size:26px}
+ .fx-choice-content{padding:14px 12px}
+ .fx-choice-files{max-height:27dvh}
+ .fx-choice-footer{display:grid;grid-template-columns:1fr 1fr}
+ .fx-choice-footer button{min-width:0;padding:10px}
+ .fx-choice-sign-options{grid-template-columns:1fr}
+}
+@media(pointer:coarse),(any-pointer:coarse){.fx-choice-modal button{min-height:44px}.fx-choice-row{min-height:64px}}
