@@ -110,3 +110,52 @@ body.fx-mode-editor .fx-assistant .chat-head b{font-size:25px!important}
 .fxie-editbox .fxie-caution{font-size:11px;line-height:1.5;color:#f0cf98;margin:8px 0}
 .fxie-root[data-mode=select] .fxie-textregion:hover,.fxie-root[data-mode=edit] .fxie-textregion:hover{background:#2e84d325!important;outline:1.5px dashed #238ae9!important}
 @media(max-width:650px){.fxie-inline-editor{min-width:140px;max-width:calc(100% - 4px)}.fxie-inline-input{min-width:120px}.fxie-inline-buttons button{padding:7px 9px!important}}
+
+
+/* FOXPDF_TOUCH_ORGANIZER_V11: touch-first thumbnail organizer and optional dual-page view */
+.fxie-mini-pages{width:242px!important;max-width:min(242px,88vw)!important;max-height:calc(100dvh - 145px);padding:10px!important;overflow-y:auto!important;overscroll-behavior:contain;scrollbar-gutter:stable}
+.fxie-organizer-head{position:relative;padding:3px 22px 6px 2px;border-bottom:1px solid #515151;margin-bottom:8px}
+.fxie-organizer-head h3{margin:0 0 5px!important;font-size:15px!important;color:#f4f4f4}
+.fxie-organizer-head p{margin:0 0 5px!important;font-size:11px;color:#d6d6d6;line-height:1.45}
+.fxie-organizer-head .fxie-touch-tip{font-size:11px!important;color:#e9be77!important}
+.fxie-org-close{position:absolute;right:0;top:0;min-width:30px;min-height:32px;background:#444!important;color:#eee!important}
+.fxie-organizer-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:6px 0 9px}
+.fxie-organizer-action{min-width:0!important;min-height:39px;line-height:1.15!important;font-size:11px!important;font-weight:650!important;background:#40372b!important;color:#f4d3a0!important;border:1px solid #906937!important;border-radius:7px;padding:6px 4px!important;white-space:normal}
+.fxie-organizer-action:hover{background:#614925!important}
+.fxie-organizer-action:disabled{opacity:.38!important;cursor:not-allowed}
+.fxie-organizer-action#fxieDeleteSelected{color:#ffd5cb!important}
+.fxie-selection{padding:6px 2px 8px;margin:0!important;color:#e7d2ae!important;font-size:11px;font-weight:600}
+.fxie-mini-list{display:flex!important;flex-direction:column;gap:9px;padding:0 3px 12px}
+.fxie-thumb-tile{position:relative;display:grid;grid-template-columns:minmax(0,1fr);padding:7px;border:1px solid #65605a;border-radius:8px;background:linear-gradient(165deg,#343434,#292929);min-width:0}
+.fxie-thumb-tile.selected,.fxie-thumb-tile:has(.fxie-thumb-preview.selected){border-color:#efbd69;box-shadow:0 0 0 1px #bc8c4b88}
+.fxie-thumb-preview{display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;min-height:95px;width:100%;padding:2px 0;background:transparent!important;touch-action:pan-y}
+.fxie-thumb-preview .fxie-mini-canvas{width:auto;max-width:100%;height:auto;max-height:175px;box-shadow:0 2px 9px #0009}
+.fxie-thumb-placeholder{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:10px;color:#c3b193;pointer-events:none}
+.fxie-thumb-footer{display:flex;justify-content:space-between;align-items:center;gap:3px;min-height:46px;margin-top:6px;border-top:1px solid #575149;padding-top:4px}
+.fxie-thumb-number{flex:1;text-align:center;font-size:12px;color:#efdfc2;font-weight:700}
+.fxie-thumb-handle{display:inline-flex;align-items:center;justify-content:center;flex:none;width:46px;min-height:43px;border:1px solid #a67c3f;border-radius:7px;background:#4d3820;color:#ffdc9c;font-size:24px;letter-spacing:-3px;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;-webkit-touch-callout:none}
+.fxie-thumb-handle.fxie-touch-pressed,.fxie-thumb-handle:active{cursor:grabbing;background:#b88239;color:#16100a}
+.fxie-thumb-beside{flex:none;width:42px;min-height:42px;color:#f8ce83!important;background:#514025!important;border:1px solid #866431!important;border-radius:6px;font-size:19px!important}
+.fxie-thumb-tile.fxie-drop-before{border-top:4px solid #f3ca7a;background:#594323}
+.fxie-thumb-tile.fxie-drop-after{border-bottom:4px solid #f3ca7a;background:#594323}
+.fxie-thumb-tile.fxie-dragging,.fxie-thumb-tile.fxie-touch-dragging{opacity:.48}
+.fxie-touch-ghost{position:fixed;z-index:12000;left:0;top:0;pointer-events:none!important;touch-action:none;display:flex;align-items:center;justify-content:center;min-width:128px;height:56px;padding:10px 14px;background:linear-gradient(135deg,#f8dda0,#b87d2b);border:2px solid #ffe3b0;color:#1c1307;border-radius:9px;box-shadow:0 8px 30px #0009;font-size:14px;font-weight:800;will-change:transform}
+.fxie-scroll.fxie-split-active{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;gap:18px}
+.fxie-scroll.fxie-split-active .fxie-mini-pages{grid-column:1 / -1;z-index:15}
+.fxie-scroll.fxie-split-active .fxie-sheetwrap{min-width:0;max-width:100%;overflow:auto}
+.fxie-split-pane{position:relative;min-width:0;min-height:210px;background:#303030;border:1px solid #585858;border-radius:8px;overflow:hidden}
+.fxie-split-head{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#3a3a3a;border-bottom:1px solid #555;padding:8px 10px;color:#e8d9c5;font-size:12px}
+.fxie-split-head button{padding:6px 10px!important;background:#444!important}
+.fxie-split-content{display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:12px;min-height:250px;background:#232323}
+.fxie-split-canvas{background:white;max-width:none;box-shadow:0 2px 18px #0009}
+.fxie-split-message{color:#eee;padding:20px;font-size:12px}
+@media(max-width:650px){
+ .fxie-mini-pages{position:fixed!important;top:66px!important;left:8px!important;bottom:10px!important;max-height:calc(100dvh - 78px)!important;width:min(320px,calc(100vw - 48px))!important;max-width:calc(100vw - 48px)!important;z-index:180!important;margin:0!important;box-shadow:6px 3px 25px #000c!important;border:1px solid #9c743e!important}
+ .fxie-organizer-action{min-height:44px!important;font-size:12px!important}
+ .fxie-thumb-handle{min-height:50px;width:54px}
+ .fxie-thumb-beside{min-height:45px;width:45px}
+ .fxie-thumb-preview{min-height:112px}
+ .fxie-scroll.fxie-split-active{display:flex;flex-direction:column;gap:12px}
+ .fxie-scroll.fxie-split-active .fxie-sheetwrap,.fxie-scroll.fxie-split-active .fxie-split-pane{width:100%;flex:none}
+}
+@media(prefers-reduced-motion:reduce){.fxie-touch-ghost{transition:none!important}}
