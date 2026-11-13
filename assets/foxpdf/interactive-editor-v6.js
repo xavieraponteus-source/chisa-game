@@ -311,7 +311,7 @@ bind("fxieSelect",()=>setMode("select"));bind("fxieText",()=>setMode("text"));bi
 bind("fxieHome",()=>$("fxTopHome")?.click());bind("fxieTools",()=>window.FoxPDFPro?.open("tools"));bind("fxieOrganize",()=>{if(mini.hidden)toggleOrganizer();else mini.scrollIntoView({block:"nearest"});});bind("fxieConvert",()=>app.advanced("convert"));bind("fxieSign",()=>window.FoxPDFTaskPicker?.launch("sign"));
 bind("fxieDigitalSign",()=>window.FoxPDFTaskPicker?.launch("certificate"));
 bind("fxieDrawSignature",()=>window.FoxPDFTaskPicker?.launch("sign"));
-bind("fxieSave",()=>app.save());bind("fxieShare",()=>window.FoxPDFReviews?.share());bind("fxiePrint",()=>window.FoxPDFPro?.open("print"));
+bind("fxieSave",()=>app.save());bind("fxieShare",()=>app.share());bind("fxiePrint",()=>window.FoxPDFPro?.open("print"));
 bind("fxieAdvanced",()=>window.FoxPDFPro?window.FoxPDFPro.open("tools"):say("Advanced tools are loading. Please try again.",true));bind("fxieChisa",()=>window.FoxPDFChisaToggle?window.FoxPDFChisaToggle(true,true):$("chat").hidden=false);bind("fxieComments",()=>window.FoxPDFPro?.open("annotate"));
 bind("fxieSearch",()=>window.FoxPDFPro?.open("search"));bind("fxieProperties",()=>window.FoxPDFPro?.open("metadata"));bind("fxieMarkup",()=>window.FoxPDFPro?.open("annotate"));
 const mini=el("aside","fxie-mini-pages");mini.id="fxieThumbnails";mini.hidden=true;mini.setAttribute("aria-label","PDF page organizer");
