@@ -62,7 +62,7 @@ try{
 }catch(e){$("fxieSheetWrap").replaceChildren(el("p","fxie-error","Unable to show page: "+e.message));say("PDF rendering failed: "+e.message,true)}
 }
 async function mutate(fn,description){const original=app.readCurrent();if(!original)return;if(!window.PDFLib)return say("Editing engine is unavailable.",true);
-try{const pdf=await PDFLib.PDFDocument.load(original.bytes.slice(0));await fn(pdf);const result=new Uint8Array(await pdf.save({useObjectStreams:true}));if(original.bytes.length<8*1024*1024){undo.push(original.bytes);if(undo.length>7)undo.shift();redo=[]}await app.replace(result);say(description)}catch(e){say("Edit failed: "+e.message,true)}}
+try{const pdf=await PDFLib.PDFDocument.load(original.bytes.slice(0));await fn(pdf);const result=new Uint8Array(await pdf.save({useObjectStreams:true}));if(original.bytes.length<8*1024*1024){undo.push(original.bytes);if(undo.length>7)undo.shift();redo=[]}await app.replace(result);say(description);return true}catch(e){say("Edit failed: "+e.message,true);return false}}
 function color(){const s=$("fxieColor").value.slice(1);return PDFLib.rgb(parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255)}
 async function placeText(p){if(!p||!check())return;const text=$("fxieInsertText").value.trim();if(!text)return say("Type some text first.",true);const size=Number($("fxieSize").value);if(size<5||size>80)return say("Font size must be between 5 and 80.",true);
 await mutate(async pdf=>{const pg=pdf.getPage(app.current().page-1),font=await pdf.embedFont(PDFLib.StandardFonts[$("fxieFont").value]);const x=p.x/rendered.scale,y=pg.getHeight()-p.y/rendered.scale-size;pg.drawText(text,{x,y,font,size,color:color(),maxWidth:pg.getWidth()-x-8,lineHeight:size*1.32})},"Text added to page "+app.current().page+".")}
@@ -160,7 +160,7 @@ async function applyLocal(){
  const chosenFont=$("fxieFont").value,size=Number($("fxieSize").value);
  if(!Number.isFinite(size)||size<5||size>80)return say("Choose a font size between 5 and 80.",true);
  if(!colors.uniform)say("Complex background detected: a local replacement may look imperfect. Review before sharing.",true);
- await mutate(async doc=>{
+ const applied=await mutate(async doc=>{
   const pg=doc.getPage(state.page-1);
   if(pg.getRotation().angle%360!==0)throw Error("This rotated page cannot be edited locally yet. Use Advanced reflow.");
   const pdfSize=pg.getSize(),x=Math.max(0,box.x/scale),h=Math.max(2,box.height/scale),w=Math.max(2,box.width/scale);
@@ -177,7 +177,7 @@ async function applyLocal(){
    pg.drawText(value,{x,y:Math.max(0,baseline),font,size,color:colorValue,maxWidth,lineHeight});
   }
  },colors.uniform?"Local text edit applied. Download your PDF when ready.":"Local edit applied. Check the background and nearby layout before saving.");
- closeInline();$("fxieReplaceBox").hidden=true;selected=null;
+ if(applied){closeInline();$("fxieReplaceBox").hidden=true;selected=null;}
 }
 $("fxieApply").onclick=()=>applyLocal();
 /* Advanced reflow stays explicit and opt-in; ordinary clicks never send PDFs to a server. */
