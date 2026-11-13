@@ -95,3 +95,18 @@ body.fx-mode-editor .fx-assistant .chat-head b{font-size:25px!important}
 .fxie-mini-page span{font-size:12px;color:#e5e5e5}
 .fxie-paneldone{display:none}
 @media(max-width:650px){.fxie-paneldone{display:inline-block!important;border:1px solid #707070!important;padding:4px 8px!important;font-size:11px!important;margin-right:8px}.fxie-root.fxie-drawer-closed .fxie-left{display:none!important}.fxie-mini-pages{position:fixed;top:75px;left:4px;margin:0;width:122px;max-height:65dvh;z-index:110}.fxie-mini-canvas{max-width:96px}}
+
+
+/* FXIE_LOCAL_TEXT_V7 - direct browser-side editing without upload prompts */
+.fxie-inline-editor{position:absolute;z-index:24;max-width:calc(100% - 5px);min-width:155px;padding:6px;box-sizing:border-box;background:#fffdfa;border:1.8px solid #2788eb;border-radius:6px;box-shadow:0 5px 22px #17283e68;display:flex;flex-direction:column;gap:5px;color:#17283e}
+.fxie-inline-input{resize:both;width:100%;min-width:130px;min-height:34px;max-height:200px;box-sizing:border-box;border:1px solid #a6c7e7!important;border-radius:4px!important;background:#fff!important;color:#17283e!important;font-family:Arial,sans-serif;padding:5px 6px!important;line-height:1.15;white-space:pre-wrap}
+.fxie-inline-buttons{display:flex;align-items:center;gap:7px;justify-content:flex-end}
+.fxie-inline-buttons button{font:600 11px/1.2 "DM Sans",system-ui,sans-serif!important;padding:6px 10px!important;border-radius:5px!important;min-width:60px}
+.fxie-inline-apply{background:#287bd1!important;color:#fff!important}
+.fxie-inline-cancel{background:#ededed!important;color:#333!important}
+.fxie-inline-apply:hover{background:#1366b7!important}
+.fxie-advanced-reflow{margin-top:7px;background:#353535!important;border:1px solid #7a6852!important;color:#e6cfaa!important;padding:9px!important;font-size:11px!important}
+.fxie-advanced-reflow:hover{background:#4b3c25!important}
+.fxie-editbox .fxie-caution{font-size:11px;line-height:1.5;color:#f0cf98;margin:8px 0}
+.fxie-root[data-mode=select] .fxie-textregion:hover,.fxie-root[data-mode=edit] .fxie-textregion:hover{background:#2e84d325!important;outline:1.5px dashed #238ae9!important}
+@media(max-width:650px){.fxie-inline-editor{min-width:140px;max-width:calc(100% - 4px)}.fxie-inline-input{min-width:120px}.fxie-inline-buttons button{padding:7px 9px!important}}
