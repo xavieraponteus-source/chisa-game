@@ -114,3 +114,24 @@ body.fx-neon-dashboard .fx-mode-editor .fx-recent{display:none}
 @media(max-width:790px){:root{--fx-rail:0px;--fx-top:65px}.fx-neon-dashboard .site-nav.fx-top{height:auto!important;min-height:65px!important;padding:8px 10px!important;gap:8px!important}.fx-brand{min-width:158px!important}.fx-brand strong{font-size:25px!important}.fx-brand svg{width:38px!important;height:38px!important}.fx-brand small{font-size:9px!important}.fx-top-nav{gap:3px!important}.fx-top-nav button{padding:8px!important;font-size:11px!important}.fx-rail{position:relative!important;top:auto!important;left:auto!important;bottom:auto!important;width:100%!important;height:54px!important;max-height:54px!important;flex-direction:row!important;overflow-x:auto!important;overflow-y:hidden!important;padding:6px!important}.fx-rail button{white-space:nowrap!important;min-height:40px!important;font-size:11px!important}.fx-rail-landscape{display:none!important}.fx-neon-dashboard .shell{margin:0!important;padding:9px 9px 100px!important}.fx-home-hero{height:250px!important;min-height:250px!important}.fx-hero-content{padding:14px 10px 14px 14px!important}.fx-home-hero h1{font-size:45px!important}.fx-home-hero p{font-size:12px!important;max-width:270px!important}.fx-hero-buttons button{min-width:0!important;font-size:12px!important}.fx-tool-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}.fx-tool-grid button{min-height:112px!important}.fx-tool-grid button b{font-size:12px!important}.fx-recent-row{grid-template-columns:1fr!important}.fx-assistant.chat-widget{z-index:101!important}}
 @media(max-width:540px){.fx-top-nav #fxTopBatch,.fx-top-nav #fxTopCloud{display:none!important}.fx-home-hero{min-height:260px!important;height:auto!important}.fx-home-hero:before{right:-30%!important;opacity:.37!important;width:105%!important}.fx-hero-content{max-width:100%!important;width:100%!important;padding:18px!important}.fx-home-hero h1{font-size:43px!important}.fx-home-hero p{max-width:78%!important}.fx-hero-buttons{flex-wrap:wrap!important}.fx-tool-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.fx-tool-grid button{min-height:111px!important}.fx-recent{padding:11px!important;margin:12px 0 0!important}.fx-assistant .chat-head b{font-size:29px!important}.fx-assistant .quick{gap:5px!important}.fx-assistant .quick button{font-size:11px!important}}
 @media(prefers-reduced-motion:reduce){.fx-tool-grid button:hover{transform:none!important}}
+
+
+/* FOXPDF AI-ART GOLD MASK V5 — site polish based on supplied luxury reference */
+.fx-brand .fx-art-fox-logo{width:76px!important;height:66px!important;max-width:none!important;object-fit:contain;filter:drop-shadow(0 0 7px rgba(255,192,78,.55)) drop-shadow(0 0 18px rgba(202,124,26,.30));margin-left:-8px!important}
+.fx-brand:hover .fx-art-fox-logo{filter:drop-shadow(0 0 9px rgba(255,218,134,.80)) drop-shadow(0 0 24px rgba(234,157,55,.50))}
+.fx-brand{min-width:415px!important;gap:10px!important}
+.fx-brand strong{letter-spacing:-.5px!important;background:linear-gradient(120deg,#fffdf2 4%,#f7eedc 58%,#da9c38 90%);-webkit-background-clip:text;background-clip:text;color:transparent!important}
+.fx-brand strong em{color:#edb85b!important;-webkit-text-fill-color:#e9b76a}
+.fx-home-hero{background-image:radial-gradient(ellipse at 77% 48%,rgba(173,100,12,.12),transparent 55%),linear-gradient(98deg,#070809 1%,#14100b 57%,#080808 100%)!important}
+.fx-home-hero::before{filter:drop-shadow(0 4px 13px rgba(240,176,51,.19));background-image:url("https://xavieraponteus-source.github.io/chisa-game/assets/foxpdf/gold-pdf-illustration.svg")!important}
+.fx-home-hero h1{font-family:"Cormorant Garamond",Georgia,serif!important;font-weight:700!important;text-shadow:0 1px 3px #000,0 0 18px #c77a2428!important}
+.fx-home-hero .fx-hero-buttons .primary{background:linear-gradient(130deg,#fff5d1,#f0bf6c 41%,#bd7a22)!important;color:#100c08!important;box-shadow:inset 0 2px 7px #fff0c36b,0 0 13px #dc9b4580!important}
+.fx-rail{background-image:radial-gradient(ellipse at 0% 97%,#aa73142c,transparent 45%),linear-gradient(175deg,#090909,#0e0e0e 72%,#1b1208)!important}
+.fx-rail button:hover i,.fx-tool-grid button:hover i{filter:drop-shadow(0 0 8px #f3bb6e77)}
+.fx-tool-grid button{border-color:#ae7c35!important;box-shadow:inset 0 -2px 9px #d69a283d,0 6px 13px #0006!important}
+.fx-tool-grid button:hover{border-color:#ffcf76!important;box-shadow:inset 0 -2px 9px #d69a286b,0 0 17px #d38e3485!important}
+.fx-recent{border-color:#c08b3c!important}
+.fx-assistant.chat-widget{border-color:#e5b65f!important;box-shadow:0 0 0 1px #a66f27,0 0 20px #b7853558!important}
+.fx-assistant .chat-head img{border-color:#efc777!important}
+@media(max-width:1540px){.fx-brand{min-width:305px!important}.fx-brand .fx-art-fox-logo{width:64px!important;height:55px!important}}
+@media(max-width:790px){.fx-brand{min-width:155px!important}.fx-brand .fx-art-fox-logo{width:42px!important;height:38px!important;margin-left:-3px!important}}
