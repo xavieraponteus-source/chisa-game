@@ -14,12 +14,12 @@ const oldHeader=document.querySelector("header.site-nav");
 const easy=$("easyMode");
 if(!oldHeader||!easy){console.warn("FoxPDF visual UI: original controls missing.");return}
 oldHeader.classList.add("fx-top");
-oldHeader.innerHTML='<a class="fx-brand" href="/" aria-label="All Xavier apps">'+logo+'<span><strong>FoxPDF <em>Studio</em></strong><small>All-in-One PDF Editor</small></span></a><div class="fx-search"><i>⌕</i><input id="fxSearch" type="search" aria-label="Search PDF tools" placeholder="Search tools, features or help…"><kbd>⌘K</kbd></div><nav class="fx-top-nav" aria-label="Top navigation"><button id="fxTopHome" class="active">⌂ Home</button><button id="fxTopFiles">▣ Files</button><button id="fxTopTools">⚒ Tools</button><button id="fxTopConvert">⇄ Convert</button><button id="fxTopProtect">♧ Security</button><button id="fxTopBatch" class="fx-gold-extra">▤ Batch</button><button id="fxTopCloud" class="fx-gold-extra">☁ Cloud</button><button id="fxTopChat">♡ Chisa</button><a class="fx-app-link" href="/">All apps</a></nav>';
+oldHeader.innerHTML='<a class="fx-brand" href="/" aria-label="All Xavier apps">'+logo+'<span><strong>FoxPDF <em>Studio</em></strong><small>All-in-One PDF Editor</small></span></a><div class="fx-search"><i>⌕</i><input id="fxSearch" type="search" aria-label="Search PDF tools" placeholder="Search tools, features or help…"><kbd>⌘K</kbd></div><nav class="fx-top-nav" aria-label="Top navigation"><button id="fxTopHome" class="active">⌂ Home</button><button id="fxTopFiles">▣ Files</button><button id="fxTopTools">⚒ Tools</button><button id="fxTopConvert">⇄ Convert</button><button id="fxTopProtect">♧ Security</button><button id="fxTopBatch" class="fx-gold-extra">▤ Batch</button><button id="fxTopCloud" class="fx-gold-extra">☁ Cloud</button><button id="fxTopSign" class="fx-sign-nav">✦ Digital Sign</button><button id="fxTopChat">♡ Chisa</button><a class="fx-app-link" href="/">All apps</a></nav>';
 oldHeader.querySelector(".fx-top-nav").appendChild(easy);
 const rail=document.createElement("aside");
 rail.className="fx-rail";rail.setAttribute("aria-label","PDF editor tools");
 rail.innerHTML='<div class="fx-rail-title">WORKSPACE</div>'+
-[['home','⌂','Home'],['edit','✎','Edit PDF'],['organize','▣','Organize Pages'],['convert','⇄','Convert'],['ocr','⌗','OCR'],['redact','◩','Redact'],['protect','♧','Protect & Sign'],['form','✍','Fill & Sign'],['compress','⇵','Compress'],['batch','▤','Batch Tools'],['compare','◫','Compare PDFs'],['icloud','☁','Cloud & Files'],['more','✧','More Tools']]
+[['home','⌂','Home'],['edit','✎','Edit PDF'],['organize','▣','Organize Pages'],['convert','⇄','Convert'],['ocr','⌗','OCR'],['redact','◩','Redact'],['protect','♧','Protect & Sign'],['form','✍','Fill & Sign'],['certificate','✦','Digital Signature'],['draw','✎','Draw on PDF'],['compress','⇵','Compress'],['batch','▤','Batch Tools'],['compare','◫','Compare PDFs'],['icloud','☁','Cloud & Files'],['more','✧','More Tools']]
 .map(([action,icon,label])=>'<button type="button" data-fx="'+action+'"'+(action==="home"?' class="active"':'')+'><i>'+icon+'</i> '+label+'</button>').join("")+
 '<div class="fx-rail-landscape" aria-hidden="true"><span>✿ ✿ ✧</span></div>';
 oldHeader.after(rail);
@@ -42,6 +42,8 @@ const cardData=[
  ['redact','◩','Redact','Remove private content'],
  ['protect','♧','Protect','Password encryption'],
  ['form','✍','Fill & Sign','Forms and visual signing'],
+ ['sign','✦','Digital Signature','Certificate or handwritten signature'],
+ ['draw','✎','Draw & Mark Up','Use finger, mouse, or stylus'],
  ['compress','⇵','Compress','Optimize file sizes'],
  ['batch','▤','Batch Process','Combine multiple files'],
  ['compare','◫','Compare','Coming soon']
@@ -163,7 +165,13 @@ function switchMode(next){
  if(mode==="editor")thumbRefresh();
  window.scrollTo({top:0,behavior:"smooth"});
 }
+window.FoxPDFHomeNav={showEditor:()=>switchMode("editor"),showHome:()=>switchMode("home")};
 function act(action){
+ const chooseFirst=["edit","organize","merge","split","convert","ocr","redact","protect","form","compress","watermark","image","numbers","review","certificate","sign","draw","batch","compare"];
+ if(chooseFirst.includes(action)){
+  if(window.FoxPDFTaskPicker){window.FoxPDFTaskPicker.launch(action);return}
+  app.say("The document chooser is loading. Please try again.");return
+ }
  switch(action){
  case "home":switchMode("home");break;
  case "edit":case "organize":switchMode("editor");break;
@@ -196,6 +204,7 @@ $("fxTopFiles").onclick=()=>app.current()?switchMode("editor"):app.open();
 $("fxTopTools").onclick=()=>act("more");
 $("fxTopConvert").onclick=()=>act("convert");
 $("fxTopProtect").onclick=()=>act("protect");
+$("fxTopSign").onclick=()=>act("sign");
 $("fxTopBatch").onclick=()=>act("batch");
 $("fxTopCloud").onclick=()=>act("icloud");
 $("fxTopChat").onclick=()=>setChisaOpen(true,true);
@@ -216,7 +225,7 @@ search.addEventListener("keydown",e=>{
 });
 document.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();search.focus()}});
 window.addEventListener("foxpdf:change",()=>{
- const count=app.documents().length;if(count>lastCount&&count>0)mode="editor";lastCount=count;
+ const count=app.documents().length;if(count>lastCount&&count>0&&!window.FoxPDFTaskPicker?.isOpen())mode="editor";lastCount=count;
  document.body.classList.toggle("fx-mode-editor",mode==="editor");
  $("fxFileName").textContent=app.current()?.name||"Document workspace";
  recentRefresh();if(mode==="editor")thumbRefresh();
