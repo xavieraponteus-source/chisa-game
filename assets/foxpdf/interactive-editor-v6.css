@@ -82,3 +82,16 @@ body.fx-mode-editor .fx-assistant .quick{max-height:150px!important}
 body.fx-mode-editor .fx-assistant .chat-head b{font-size:25px!important}
 @media(max-width:920px){.fxie-layout{grid-template-columns:218px minmax(0,1fr) 42px}.fxie-left{padding:11px}.fxie-right button{width:35px}.fxie-tabs{gap:1px}.fxie-tabs button{padding:7px}.fxie-filename{max-width:24%}}
 @media(max-width:650px){.fxie-root{height:100dvh!important}.fxie-topbar{padding:4px 6px;gap:4px}.fxie-tabs button:not(.selected):not(#fxieHome){display:none}.fxie-topright button{padding:6px 8px}.fxie-filename{font-size:11px;max-width:25%}.fxie-layout{grid-template-columns:1fr 37px}.fxie-left{display:none}.fxie-stage{min-width:0}.fxie-editorbar{flex-wrap:wrap;height:auto;min-height:72px;gap:3px;padding:4px}.fxie-editorbar button{min-width:27px;min-height:26px;padding:4px;font-size:16px}.fxie-editorbar select{min-height:26px;font-size:11px}.fxie-scroll{padding:14px 8px 22px}.fxie-right button{width:33px;font-size:17px}.fxie-root[data-mode=edit] .fxie-left,.fxie-root[data-mode=text] .fxie-left{display:block;position:fixed;top:49px;bottom:0;left:0;width:228px;z-index:110;box-shadow:12px 0 40px #000a}.fxie-filename{display:none}}
+
+/* FXIE_THUMBNAILS_V61: page manager and mobile editor controls */
+.fxie-scroll{position:relative}
+.fxie-mini-pages{position:sticky;top:0;float:left;z-index:5;margin:-28px 16px 0 -14px;width:144px;max-height:calc(100dvh - 135px);overflow-y:auto;overflow-x:hidden;background:#343434;color:#eee;border:1px solid #656565;border-radius:7px;padding:8px;box-shadow:4px 8px 18px #0007}
+.fxie-mini-pages[hidden]{display:none!important}
+.fxie-mini-pages h3{margin:4px 3px 11px!important;font-size:13px!important;font-weight:700!important;color:#e9e9e9}
+.fxie-mini-list{display:flex;flex-direction:column;gap:12px}
+.fxie-mini-page{display:flex;align-items:center;flex-direction:column;gap:4px;border:1px solid transparent!important;background:transparent!important;padding:3px!important}
+.fxie-mini-page.selected{border-color:#59a6fb!important;background:#4175b12e!important}
+.fxie-mini-canvas{display:block;max-width:120px;max-height:155px;box-shadow:0 2px 9px #0008;background:white}
+.fxie-mini-page span{font-size:12px;color:#e5e5e5}
+.fxie-paneldone{display:none}
+@media(max-width:650px){.fxie-paneldone{display:inline-block!important;border:1px solid #707070!important;padding:4px 8px!important;font-size:11px!important;margin-right:8px}.fxie-root.fxie-drawer-closed .fxie-left{display:none!important}.fxie-mini-pages{position:fixed;top:75px;left:4px;margin:0;width:122px;max-height:65dvh;z-index:110}.fxie-mini-canvas{max-width:96px}}
