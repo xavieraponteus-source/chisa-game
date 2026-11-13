@@ -95,7 +95,7 @@ function renderChoice(){
    if(!overlay)return;
    const indices=added.map(d=>d.index);
    if(!indices.length)throw Error("No readable PDF was opened. Check the file format and password.");
-   if(!mult){selected=new Set([indices[0]]);await advance();}
+   if(!mult){selected=new Set([indices[0]]);loading=false;await advance();}
    else{for(const idx of indices)selected.add(idx);renderChoice();showStatus("Added "+indices.length+" PDF"+(indices.length>1?"s":"")+". Select at least two, then Merge selected PDFs.")}
   }catch(e){error(e)}
   finally{loading=false;filePicker.value=""}
