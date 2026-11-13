@@ -151,9 +151,11 @@ function act(action){
  case "image":app.click("imagePdf");break;
  case "numbers":app.click("numbers");break;
  case "icloud":app.current()?app.share():app.open();break;
- case "more":if(!app.current()){app.say("Open a PDF first to use advanced tools.");app.open()}else{switchMode("editor");$("advancedPanel")?.scrollIntoView({behavior:"smooth"})}break;
- case "batch":app.say("You can combine multiple PDFs with Merge. Other batch operations aren't available in this web edition yet.");app.open();break;
- case "compare":app.say("Side-by-side PDF comparison isn't available yet. I can't run that task here.");break;
+ case "review":window.FoxPDFReviews?window.FoxPDFReviews.share():app.say("Review sharing is still loading.");break;
+ case "certificate":window.FoxPDFReviews?window.FoxPDFReviews.sign():app.say("Certificate signing is still loading.");break;
+ case "more":window.FoxPDFPro?window.FoxPDFPro.open("tools"):app.say("Additional tools are loading. Please retry.");break;
+ case "batch":window.FoxPDFPro?window.FoxPDFPro.open("batch"):app.say("Batch tools are loading. Please retry.");break;
+ case "compare":window.FoxPDFPro?window.FoxPDFPro.open("compare"):app.say("Document comparison tools are loading. Please retry.");break;
  default:app.say("I couldn't find that tool. You can ask Chisa for help.")
  }
 }
