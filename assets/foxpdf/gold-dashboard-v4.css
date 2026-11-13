@@ -256,3 +256,13 @@ body.fx-mode-editor .fx-assistant.chat-widget.fx-chat-collapsed .chat-fab{
 @media(pointer:coarse),(any-pointer:coarse){
  #fxTopSign,.fx-tool-grid [data-fx=sign],.fx-tool-grid [data-fx=draw]{touch-action:manipulation!important;min-height:44px!important}
 }
+
+
+/* FOXPDF_RAIL_OVERLAP_FIX_V14 — keep tool labels clear; remove decorative overlay */
+body.fx-neon-dashboard .fx-rail-landscape,
+body.fx-neon-dashboard .fx-rail-landscape::before,
+body.fx-neon-dashboard .fx-rail-landscape::after{display:none!important;content:none!important;pointer-events:none!important}
+body.fx-neon-dashboard .fx-rail{padding-bottom:32px!important;isolation:isolate;overflow-x:hidden!important;overflow-y:auto!important;scroll-padding-bottom:32px!important}
+body.fx-neon-dashboard .fx-rail button{position:relative!important;z-index:1!important;opacity:1!important;visibility:visible!important;color:#f5ead8!important;background-clip:padding-box!important;flex-shrink:0}
+body.fx-neon-dashboard .fx-rail button i{opacity:1!important;color:#f0c56e!important}
+@media(max-width:790px){body.fx-neon-dashboard .fx-rail{overflow-x:auto!important;overflow-y:hidden!important;padding:6px 10px!important;scroll-padding-inline:10px!important}}
