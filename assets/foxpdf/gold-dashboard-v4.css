@@ -232,3 +232,27 @@ body.fx-mode-editor .fx-assistant.chat-widget.fx-chat-collapsed .chat-fab{
  .fx-brand .fx-art-fox-logo{animation:none!important}
  .fx-neon-dashboard *{scroll-behavior:auto!important}
 }
+
+
+/* FX_SIGN_DISCOVERY_V13 — clear entry points for document chooser & signing */
+.fx-top-nav #fxTopSign{
+ background:linear-gradient(115deg,#f8d89a,#b78138)!important;color:#160f07!important;
+ border:1px solid #ffdfa9!important;font-size:12px!important;font-weight:850!important;
+ border-radius:10px!important;box-shadow:0 0 12px #c9984d5b!important;
+ min-height:39px!important;white-space:nowrap!important;padding:8px 13px!important
+}
+.fx-top-nav #fxTopSign:hover{filter:brightness(1.12)!important}
+.fx-tool-grid [data-fx=sign],.fx-tool-grid [data-fx=draw]{
+ border-color:#deab5f!important;background:linear-gradient(145deg,#40301c,#15110d 80%)!important
+}
+.fx-tool-grid [data-fx=sign] i,.fx-tool-grid [data-fx=draw] i{color:#ffce74!important}
+@media(max-width:940px){
+ .fx-top-nav #fxTopSign{padding:7px 10px!important;min-height:42px!important}
+}
+@media(max-width:640px){
+ .fx-top-nav{overflow-x:auto!important;overflow-y:hidden!important;-webkit-overflow-scrolling:touch!important}
+ .fx-top-nav #fxTopSign{display:inline-flex!important;align-items:center;justify-content:center;flex:0 0 auto!important;min-height:43px!important;font-size:12px!important}
+}
+@media(pointer:coarse),(any-pointer:coarse){
+ #fxTopSign,.fx-tool-grid [data-fx=sign],.fx-tool-grid [data-fx=draw]{touch-action:manipulation!important;min-height:44px!important}
+}
