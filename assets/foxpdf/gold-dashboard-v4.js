@@ -94,7 +94,8 @@ if(chatWidget&&panel&&fab){
   chatWidget.classList.toggle("fx-chisa-open",visible);
   fab.setAttribute("aria-expanded",String(visible));
  }).observe(panel,{attributes:true,attributeFilter:["hidden"]});
- setChisaOpen(false,false);
+ const previouslyClosed=(()=>{try{return sessionStorage.getItem("foxpdf-chisa-closed")==="1"}catch(_){return false}})();
+ setChisaOpen(window.innerWidth>1160&&!previouslyClosed,false);
 }
 if(chatWidget&&panel){
  chatWidget.classList.add("fx-assistant");
@@ -120,7 +121,7 @@ if(chatWidget&&panel){
  }
  const info=panel.querySelector(".no-ai");if(info)info.textContent="Chisa runs supported PDF tools. Full document-reading AI isn't connected yet.";
  const fabImage=fab?.querySelector("img");if(fabImage){fabImage.src=avatar;fabImage.alt="Chisa assistant"}
- if(window.innerWidth>1160&&(()=>{try{return sessionStorage.getItem("foxpdf-chisa-closed")!=="1"}catch(_){return true}})())setChisaOpen(true,false);
+ // Initial expanded/collapsed state was restored above.
 }
 document.body.classList.add("fx-neon-dashboard");
 let mode="home",lastCount=app.documents().length,thumbToken=0;
