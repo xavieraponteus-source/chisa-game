@@ -29,6 +29,20 @@ function setMode(m){mode=m;view.classList.remove("fxie-drawer-closed");view.data
 say(({select:"Select a text region on the page.",edit:"Click existing text to edit its paragraph.",text:"Enter text on the left, then click the page.",image:"Choose a picture, then click where it should go.",highlight:"Drag across a region on the page."})[m]);if(m==="image"&&!pendingImage)$("fxieImageFile").click()}
 async function getJs(){if(window.pdfjsLib)return window.pdfjsLib;if(!window.fxieJS)window.fxieJS=new Promise((resolve,reject)=>{const script=document.createElement("script");script.src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";script.onload=()=>{if(!window.pdfjsLib)return reject(Error("PDF renderer not found"));pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";resolve(pdfjsLib)};script.onerror=()=>reject(Error("PDF renderer could not load"));document.head.append(script)});return window.fxieJS}
 function point(e){if(!rendered)return null;const r=rendered.canvas.getBoundingClientRect();if(!r.width||!r.height)return null;return{x:(e.clientX-r.left)/r.width*rendered.w,y:(e.clientY-r.top)/r.height*rendered.h}}
+
+/* Both PDF canvases use the same scale and equal-width, equal-height preview frames.
+   Different original page aspect ratios are centered, never stretched or cropped. */
+async function spreadMetrics(reader,leftPage,rightPage){
+ const container=$("fxieScroll");
+ const left=(await reader.getPage(leftPage)).getViewport({scale:1});
+ const right=(await reader.getPage(rightPage)).getViewport({scale:1});
+ const mobile=window.matchMedia("(max-width:650px)").matches;
+ const width=Math.max(190,mobile?container.clientWidth-30:(container.clientWidth-68)/2);
+ const maxWidth=Math.max(left.width,right.width),maxHeight=Math.max(left.height,right.height);
+ const scale=zoom==="fit"?Math.max(.20,Math.min(2.5,(width-30)/maxWidth)):Number(zoom);
+ return{scale,frameWidth:width,frameHeight:Math.ceil(maxHeight*scale+28),left,right};
+}
+
 async function draw(){
 if(!document.body.classList.contains("fx-mode-editor"))return;
 const d=app.current();if(!d)return;
@@ -37,7 +51,12 @@ try{
  const pdfjs=await getJs(),reader=await pdfjs.getDocument({data:app.bytes().slice(0)}).promise;
  if(token!==renderVersion){reader.destroy();return}
  const page=await reader.getPage(d.page),base=page.getViewport({scale:1}),container=$("fxieScroll");
- const effectiveWidth=splitPage?Math.max(250,(container.clientWidth-100)/2):Math.max(380,container.clientWidth);const scale=zoom==="fit"?Math.min(2.5,Math.max(.45,(effectiveWidth-55)/base.width)):Number(zoom),vp=page.getViewport({scale});
+ const spread=splitPage?await spreadMetrics(reader,d.page,Math.min(splitPage,reader.numPages)):null;
+ if(token!==renderVersion){reader.destroy();return}
+ const effectiveWidth=Math.max(330,container.clientWidth);
+ const scale=spread?spread.scale:(zoom==="fit"?Math.min(2.5,Math.max(.45,(effectiveWidth-55)/base.width)):Number(zoom));
+ const vp=page.getViewport({scale});
+ if(spread)container.style.setProperty("--fxie-spread-frame-height",spread.frameHeight+"px");
  const sheet=el("div","fxie-sheet"),canvas=el("canvas","fxie-paper"),layer=el("div","fxie-textlayer"),overlay=el("div","fxie-drawing");
  sheet.style.width=vp.width+"px";sheet.style.height=vp.height+"px";
  canvas.width=Math.ceil(vp.width*devicePixelRatio);canvas.height=Math.ceil(vp.height*devicePixelRatio);canvas.style.width=vp.width+"px";canvas.style.height=vp.height+"px";
@@ -554,24 +573,39 @@ function closeSplitView(){
  if(splitReader){try{splitReader.destroy()}catch(_){}splitReader=null}
  splitPane?.remove();splitPane=null;
  $("fxieScroll").classList.remove("fxie-split-active");
+ $("fxieScroll").style.removeProperty("--fxie-spread-frame-height");
  say("Returned to single-page view.");
  draw();
 }
-async function setSplitView(pageNumber){
+
+async function setSplitView(pageNumber,refresh=false){
  const current=app.current();if(!current)return;
  const n=Number(pageNumber);
  if(!Number.isInteger(n)||n<1||n>current.pages){say("Choose a page in this PDF.",true);return}
- if(splitPane&&splitPage===n){closeSplitView();return}
+ if(splitPane&&splitPage===n&&!refresh){closeSplitView();return}
  splitPage=n;const token=++splitToken;
  const scroll=$("fxieScroll");
  if(!splitPane){splitPane=el("aside","fxie-split-pane");scroll.append(splitPane)}
  scroll.classList.add("fxie-split-active");
- requestAnimationFrame(draw);
+ if(!refresh)requestAnimationFrame(draw);
  splitPane.replaceChildren();
  const header=el("div","fxie-split-head");
- const title=el("strong","","Page "+n+" · side-by-side");
- const close=el("button","","✕");close.type="button";close.title="Close split view";close.onclick=closeSplitView;
- header.append(title,close);
+ const title=el("strong","","Page "+n+" · right preview");
+ const actions=el("div","fxie-split-controls");
+ const step=(symbol,next,label)=>{
+  const b=el("button","",symbol);b.type="button";b.title=label;b.setAttribute("aria-label",label);
+  b.onclick=()=>setSplitView(Math.max(1,Math.min(app.current().pages,next())),true);
+  actions.append(b);
+ };
+ step("‹",()=>splitPage-1,"Previous page in right preview");
+ const input=el("input","fxie-split-page-input");
+ input.type="number";input.min="1";input.max=String(current.pages);input.value=String(n);
+ input.title="Right preview page number";input.setAttribute("aria-label","Right preview page number");
+ input.onchange=()=>{const number=Math.max(1,Math.min(app.current()?.pages||1,Number(input.value)||n));setSplitView(number,true)};
+ actions.append(input);
+ step("›",()=>splitPage+1,"Next page in right preview");
+ const close=el("button","fxie-split-close","✕");close.type="button";close.title="Close side-by-side view";close.setAttribute("aria-label","Close right page preview");close.onclick=closeSplitView;
+ actions.append(close);header.append(title,actions);
  const canvasWrap=el("div","fxie-split-content"),placeholder=el("p","fxie-split-message","Rendering page "+n+"…");
  canvasWrap.append(placeholder);splitPane.append(header,canvasWrap);
  try{
@@ -579,17 +613,20 @@ async function setSplitView(pageNumber){
   if(token!==splitToken){reader.destroy();return}
   if(splitReader){try{splitReader.destroy()}catch(_){}}
   splitReader=reader;
-  const pg=await reader.getPage(n),base=pg.getViewport({scale:1});
-  const available=Math.max(220,scroll.clientWidth<750?scroll.clientWidth-35:(scroll.clientWidth-110)/2);
-  const view=pg.getViewport({scale:Math.max(.24,Math.min(1.5,available/base.width))});
-  const canvas=el("canvas","fxie-split-canvas");canvas.width=Math.ceil(view.width*devicePixelRatio);canvas.height=Math.ceil(view.height*devicePixelRatio);
-  canvas.style.width=view.width+"px";canvas.style.height=view.height+"px";
+  const pg=await reader.getPage(n);
+  const metrics=await spreadMetrics(reader,Math.min(current.page,reader.numPages),n);
+  if(token!==splitToken)return;
+  scroll.style.setProperty("--fxie-spread-frame-height",metrics.frameHeight+"px");
+  const viewport=pg.getViewport({scale:metrics.scale});
+  const canvas=el("canvas","fxie-split-canvas");
+  canvas.width=Math.ceil(viewport.width*devicePixelRatio);canvas.height=Math.ceil(viewport.height*devicePixelRatio);
+  canvas.style.width=viewport.width+"px";canvas.style.height=viewport.height+"px";
   const ctx=canvas.getContext("2d");ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-  await pg.render({canvasContext:ctx,viewport:view}).promise;
+  await pg.render({canvasContext:ctx,viewport}).promise;
   if(token!==splitToken)return;
   canvasWrap.replaceChildren(canvas);
-  say("Side-by-side: page "+current.page+" and page "+n+". Choose another ⇿ thumbnail to change the right page.");
- }catch(e){if(token===splitToken)canvasWrap.replaceChildren(el("p","fxie-split-message","Unable to open comparison page: "+e.message))}
+  if(!refresh) say("Equal-size page previews are open. Drag a thumbnail to the right preview to compare another page.");
+ }catch(err){if(token===splitToken)canvasWrap.replaceChildren(el("p","fxie-split-message","Unable to open right preview: "+err.message))}
 }
 
 function toggleOrganizer(){
@@ -615,8 +652,19 @@ window.addEventListener("foxpdf:change",()=>{const d=app.current();if(d){$("fxie
   thumbRefreshTimer=setTimeout(()=>renderThumbnails().catch(e=>say("Could not update page organizer: "+e.message,true)),110);
  }else updateThumbSelection();
 }
+if(splitPage&&d){
+ if(splitPage>d.pages)splitPage=d.pages;
+ requestAnimationFrame(()=>setSplitView(splitPage,true));
+}
 if(document.body.classList.contains("fx-mode-editor"))requestAnimationFrame(draw)});
 let active=false;new MutationObserver(()=>{const now=document.body.classList.contains("fx-mode-editor");if(now!==active){active=now;if(now)requestAnimationFrame(draw)}}).observe(document.body,{attributes:true,attributeFilter:["class"]});
+let fxieResizeTask=null;
+window.addEventListener("resize",()=>{
+ clearTimeout(fxieResizeTask);fxieResizeTask=setTimeout(()=>{
+  if(!document.body.classList.contains("fx-mode-editor"))return;
+  draw();if(splitPage)setSplitView(splitPage,true);
+ },140);
+},{passive:true});
 window.FoxPDFInteractiveEditor={
  open:(newMode="select")=>{if(!app.current()){app.open();return;}const button=document.querySelector('.fx-rail [data-fx="edit"]');if(button)button.click();setMode(newMode)},
  setMode,
