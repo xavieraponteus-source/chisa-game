@@ -218,7 +218,7 @@ $("fxieCloudReflow").onclick=async()=>{
 for(const b of view.querySelectorAll("[data-mode]"))b.onclick=()=>setMode(b.dataset.mode);
 const bind=(id,fn)=>{$(id).onclick=fn};
 bind("fxieSelect",()=>setMode("select"));bind("fxieText",()=>setMode("text"));bind("fxieImage",()=>setMode("image"));bind("fxieHighlight",()=>setMode("highlight"));
-bind("fxieHome",()=>$("fxTopHome")?.click());bind("fxieTools",()=>window.FoxPDFPro?.open("tools"));bind("fxieOrganize",()=>app.click("reorder"));bind("fxieConvert",()=>app.advanced("convert"));bind("fxieSign",()=>window.FoxPDFReviews?.sign());
+bind("fxieHome",()=>$("fxTopHome")?.click());bind("fxieTools",()=>window.FoxPDFPro?.open("tools"));bind("fxieOrganize",()=>{if(mini.hidden)toggleOrganizer();else mini.scrollIntoView({block:"nearest"});});bind("fxieConvert",()=>app.advanced("convert"));bind("fxieSign",()=>window.FoxPDFReviews?.sign());
 bind("fxieSave",()=>app.save());bind("fxieShare",()=>window.FoxPDFReviews?.share());bind("fxiePrint",()=>window.FoxPDFPro?.open("print"));
 bind("fxieAdvanced",()=>window.FoxPDFPro?window.FoxPDFPro.open("tools"):say("Advanced tools are loading. Please try again.",true));bind("fxieChisa",()=>window.FoxPDFChisaToggle?window.FoxPDFChisaToggle(true,true):$("chat").hidden=false);bind("fxieComments",()=>window.FoxPDFPro?.open("annotate"));
 bind("fxieSearch",()=>window.FoxPDFPro?.open("search"));bind("fxieProperties",()=>window.FoxPDFPro?.open("metadata"));bind("fxieMarkup",()=>window.FoxPDFPro?.open("annotate"));
@@ -226,6 +226,7 @@ const mini=el("aside","fxie-mini-pages");mini.id="fxieThumbnails";mini.hidden=tr
 
 /* Local-first visual page organizer: drag, add, delete, duplicate, move, rotate */
 let thumbnailLoad=0,selectedThumb=1,draggedThumb=0,thumbReader=null,thumbObserver=null,thumbRefreshTimer=null,organizerBusy=false,deletePending=false,splitPage=0;
+let thumbRenderedSource=null;
 let touchDrag=null,touchDragTimer=null,touchGhost=null,touchDrop=null;
 function clearTouchDrag(){
  if(touchDragTimer){clearTimeout(touchDragTimer);touchDragTimer=null}
@@ -430,6 +431,7 @@ thumbsInput.addEventListener("change",async e=>{
 async function renderThumbnails(){
  const d=app.current();if(!d||mini.hidden)return;
  const token=++thumbnailLoad;
+ thumbRenderedSource=d.bytes;
  clearTouchDrag();
  if(thumbObserver)thumbObserver.disconnect();
  if(thumbReader){try{thumbReader.destroy()}catch(_){}thumbReader=null}
@@ -564,6 +566,7 @@ async function setSplitView(pageNumber){
  const scroll=$("fxieScroll");
  if(!splitPane){splitPane=el("aside","fxie-split-pane");scroll.append(splitPane)}
  scroll.classList.add("fxie-split-active");
+ requestAnimationFrame(draw);
  splitPane.replaceChildren();
  const header=el("div","fxie-split-head");
  const title=el("strong","","Page "+n+" · side-by-side");
@@ -606,7 +609,13 @@ bind("fxieMinus",()=>scaleBy(.8));bind("fxiePlus",()=>scaleBy(1.25));
 bind("fxieUndo",async()=>{if(!undo.length)return say("Nothing to undo.");const d=app.readCurrent();redo.push(d.bytes);await app.replace(undo.pop());say("Last change undone.")});
 bind("fxieRedo",async()=>{if(!redo.length)return say("Nothing to redo.");const d=app.readCurrent();undo.push(d.bytes);await app.replace(redo.pop());say("Change restored.")});
 bind("fxieInfo",()=>alert("The FoxPDF editor renders pages and selectable text blocks. Original paragraph editing uses guarded server processing and may reject font-complex layouts. Permanent redaction is a separate, secure operation."));
-window.addEventListener("foxpdf:change",()=>{const d=app.current();if(d){$("fxieFilename").textContent=d.name;$("fxieCount").textContent=d.page+" / "+d.pages;if(historyName!==d.name){undo=[];redo=[];historyName=d.name}}if(document.body.classList.contains("fx-mode-editor"))requestAnimationFrame(draw)});
+window.addEventListener("foxpdf:change",()=>{const d=app.current();if(d){$("fxieFilename").textContent=d.name;$("fxieCount").textContent=d.page+" / "+d.pages;if(historyName!==d.name){undo=[];redo=[];historyName=d.name}}if(!mini.hidden&&d){
+ if(d.bytes!==thumbRenderedSource){
+  clearTimeout(thumbRefreshTimer);
+  thumbRefreshTimer=setTimeout(()=>renderThumbnails().catch(e=>say("Could not update page organizer: "+e.message,true)),110);
+ }else updateThumbSelection();
+}
+if(document.body.classList.contains("fx-mode-editor"))requestAnimationFrame(draw)});
 let active=false;new MutationObserver(()=>{const now=document.body.classList.contains("fx-mode-editor");if(now!==active){active=now;if(now)requestAnimationFrame(draw)}}).observe(document.body,{attributes:true,attributeFilter:["class"]});
 window.FoxPDFInteractiveEditor={
  open:(newMode="select")=>{if(!app.current()){app.open();return;}const button=document.querySelector('.fx-rail [data-fx="edit"]');if(button)button.click();setMode(newMode)},
