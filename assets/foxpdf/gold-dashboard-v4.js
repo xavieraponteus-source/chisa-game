@@ -233,6 +233,56 @@ window.addEventListener("foxpdf:change",()=>{
 window.addEventListener("resize",()=>{
  if(window.innerWidth<=1160&&panel&&!panel.hidden&&document.activeElement!==$("question"))setChisaOpen(false,false);
 });
+
+// FOXPDF_CHISA_GUIDED_HELP_V2: deterministic, honest step-by-step help without AI.
+const foxChisaGuides=[
+ [/font|typeface|bold|italic|font style/,"1. Open your PDF. 2. Choose Text or Edit existing text. 3. Find Font style in the text panel. 4. Choose a PDF font style, import a TTF/OTF font, or use installed fonts where supported. 5. Apply your change and Save PDF."],
+ [/paragraph|reflow|existing text|edit.*text/,"1. Open the PDF and choose Edit existing text. 2. Tap the text to select it. 3. Type the replacement. 4. For a quick appearance change, apply the local edit. For genuine paragraph reflow, choose Advanced Reflow and approve uploading a copy. 5. Check the result and save. I can't guarantee original-font reflow in every PDF."],
+ [/sign|signature/,"1. Open your PDF. 2. Choose Draw Signature or E-Sign. 3. Draw or type the signature. 4. Place it on the page. 5. Adjust position and save. A drawn signature is not a certificate-based digital signature."],
+ [/draw|highlight|pen|markup|annotat/,"1. Open the document. 2. Select Draw or Highlight. 3. Mark directly on the page with a finger, stylus, or mouse. 4. Use the thickness and color controls. 5. Undo if needed, then save."],
+ [/merge|combine/,"1. Open the first PDF. 2. Add the other files with Choose PDF files. 3. Select Merge. 4. Review the merged result. 5. Download it. You can also say 'merge my files' and I can run the supported merge tool."],
+ [/split|extract/,"1. Open your PDF. 2. Choose Split. 3. Enter the pages to extract, such as 1-3,5. 4. Review the result. 5. Download it. Say 'split pages 1-3,5' if you want me to run it."],
+ [/reorder|organize|rotate|delete page|page thumbnail/,"1. Open your PDF. 2. Choose Organize or Pages. 3. Drag or select thumbnails to reorder; use Rotate or Delete for specific pages. 4. Review the new order. 5. Save PDF. I can rotate a page for you when you tell me its number."],
+ [/ocr|scan|searchable/,"1. Open the scanned PDF. 2. Open Advanced Tools and choose OCR scanned PDF. 3. Set the language. 4. Approve processing a copy on the server. 5. Review and download the searchable PDF. The processor has file-size and page limits."],
+ [/redact|private info|sensitive|black.?out/,"1. Open the PDF. 2. Open Advanced Tools and choose Permanent redaction. 3. Enter the exact words to remove. 4. Confirm processing. 5. Verify the resulting PDF cannot reveal the removed text by search or copying. A black highlight alone is NOT permanent redaction."],
+ [/password|encrypt|protect|secure/,"1. Open the PDF. 2. Open Advanced Tools. 3. Choose Password protect. 4. Enter and confirm a strong password. 5. Download the protected copy. Keep the password safely; I can't recover it for you."],
+ [/convert|word|excel|powerpoint|office|export/,"1. Open the PDF. 2. Choose Advanced Tools, then Convert / Export. 3. Choose DOCX, XLSX, PPTX, TXT, PNG, JPG or another available format. 4. Download the result. 5. Review its formatting. Complex layouts may change."],
+ [/form|checkbox|dropdown|fillable/,"1. Open the PDF. 2. Select Fill PDF form for fields already present. 3. Choose a field and enter a value. 4. Review and save. This browser version cannot automatically turn every printed underline or checkbox into a new interactive form field; the iOS app has additional form tools."],
+ [/watermark|stamp|page number|bates|header|footer/,"1. Open the PDF. 2. Choose Watermark or Page numbers. 3. Enter your text or numbering choice. 4. Preview the result. 5. Download. Custom Bates numbering and headers are more extensive in the iOS app."],
+ [/save|download|share|icloud|print/,"1. Open or finish editing your PDF. 2. Select Save PDF or Download edited PDF. 3. Choose your destination when your browser asks. 4. Open the file to verify. To share, use Share. I can't silently place files in your personal iCloud or email account."],
+ [/side.by.side|two pages|zoom|thumbnail/,"1. Open your document. 2. Expand Pages or Thumbnails. 3. Choose the pages to view. 4. Adjust zoom for readability. Drag-to-pair two-page editing is currently more complete in the iOS app."]
+];
+const foxHelpForm=$("ask"),foxHelpInput=$("question"),foxHelpMessages=$("messages");
+if(foxHelpForm&&foxHelpInput&&foxHelpMessages){
+ foxHelpForm.addEventListener("submit",function(event){
+  const raw=(foxHelpInput.value||"").trim(),q=raw.toLowerCase();
+  if(!raw)return;
+  const wantsHelp=/^(?:how|help|guide|what|where|walk me through|show me how|tell me how|explain|steps|tutorial)\b/.test(q)||/\bstep.by.step\b/.test(q);
+  const unsupported=/\b(summarize|summarise|analyze my pdf|translate my document|automatic cloud sync|live collaboration)\b/.test(q);
+  const toggle=q.match(/^(?:use|open|activate|select|switch to)\s+(?:the\s+)?(draw|pen|highlight|text|edit existing text|image|organize|pages|undo|redo|signature)(?:\s+tool)?[.!]?$/);
+  if(!wantsHelp&&!unsupported&&!toggle)return;
+  event.preventDefault();event.stopImmediatePropagation();
+  const user=document.createElement("div");user.className="bubble user";user.textContent=raw;foxHelpMessages.appendChild(user);
+  const respond=document.createElement("div");respond.className="bubble";
+  if(toggle){
+   const key=toggle[1];
+   const ids={draw:"[data-mode='draw']",pen:"[data-mode='draw']",highlight:"[data-mode='highlight']",text:"[data-mode='text']","edit existing text":"[data-mode='edit']",image:"[data-mode='image']",organize:"#fxieOrganize",pages:"#fxieOrganize",undo:"#fxieUndo",redo:"#fxieRedo",signature:"#fxieDrawSignature"};
+   const button=document.querySelector(ids[key]||"___");
+   if(button){button.click();respond.textContent="I selected "+key+". You can use it directly on the PDF page. Save when finished."}
+   else{respond.textContent="I can't activate "+key+" right now. Open a PDF, choose Edit, and select that tool. I'll guide you, but I won't claim the tool ran."}
+  }else if(unsupported){
+   respond.textContent="I can't automatically analyze, summarize, translate, or collaborate on an entire PDF without the required connected service. You can still use PDF Search/OCR to extract the relevant text, then copy the section you need. I won't claim I've read the document.";
+  }else if(/what can you do|what.*help/.test(q)){
+   respond.textContent="I can directly perform supported tasks such as merge, split, rotate, reorder, duplicate, add text, watermark, and save/share. I can also guide you step by step through fonts, signatures, OCR, reflow, redaction, conversion, forms, and protection. I will say when something is unavailable.";
+  }else {
+   const guide=foxChisaGuides.find(([pattern])=>pattern.test(q));
+   respond.textContent=guide?guide[1]:"I can guide you through the PDF tools, but I'm not sure which action you want. Try asking 'How do I merge PDFs?', 'How do I edit text?', 'How do I sign?', or 'How do I save?'. For tasks outside FoxPDF, I can't perform them here.";
+  }
+  foxHelpMessages.appendChild(respond);foxHelpInput.value="";
+  foxHelpMessages.scrollTop=foxHelpMessages.scrollHeight;
+ },true);
+}
+
 recentRefresh();switchMode("home");
 if(!window.pdfjsLib){
  const s=document.createElement("script");s.async=true;s.src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";
