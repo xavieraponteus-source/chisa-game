@@ -69,17 +69,32 @@ if(viewer){
 }
 const chatWidget=document.querySelector(".chat-widget");
 const panel=$("chat"),fab=$("chatFab");
+function setChisaOpen(open,focus=false){
+ if(!chatWidget||!panel||!fab)return;
+ const visible=Boolean(open);
+ panel.hidden=!visible;
+ fab.hidden=false;
+ fab.setAttribute("aria-expanded",String(visible));
+ fab.setAttribute("aria-label",visible?"Chisa assistant open":"Open Chisa assistant");
+ chatWidget.classList.toggle("fx-chat-collapsed",!visible);
+ chatWidget.classList.toggle("fx-chisa-closed",!visible);
+ chatWidget.classList.toggle("fx-chisa-open",visible);
+ try{sessionStorage.setItem("foxpdf-chisa-closed",visible?"0":"1")}catch(_){}
+ if(visible&&focus)$("question")?.focus();
+}
+window.FoxPDFChisaToggle=setChisaOpen;
 if(chatWidget&&panel&&fab){
- // Maintain real collapsed state: hide the full outer panel when chat is closed.
- const syncChat=()=>{
-  const closed=panel.hidden;
-  chatWidget.classList.toggle("fx-chat-collapsed",closed);
-  fab.setAttribute("aria-expanded",String(!closed));
-  fab.setAttribute("aria-label",closed?"Open Chisa assistant":"Close Chisa assistant");
- };
- new MutationObserver(syncChat).observe(panel,{attributes:true,attributeFilter:["hidden"]});
- document.getElementById("closeChat")?.addEventListener("click",()=>{panel.hidden=true;syncChat();fab.focus()});
- syncChat();
+ fab.onclick=()=>setChisaOpen(panel.hidden,true);
+ const close=$("closeChat");
+ if(close)close.onclick=()=>{setChisaOpen(false,false);fab.focus()};
+ new MutationObserver(()=>{
+  const visible=!panel.hidden;
+  chatWidget.classList.toggle("fx-chat-collapsed",!visible);
+  chatWidget.classList.toggle("fx-chisa-closed",!visible);
+  chatWidget.classList.toggle("fx-chisa-open",visible);
+  fab.setAttribute("aria-expanded",String(visible));
+ }).observe(panel,{attributes:true,attributeFilter:["hidden"]});
+ setChisaOpen(false,false);
 }
 if(chatWidget&&panel){
  chatWidget.classList.add("fx-assistant");
@@ -105,7 +120,7 @@ if(chatWidget&&panel){
  }
  const info=panel.querySelector(".no-ai");if(info)info.textContent="Chisa runs supported PDF tools. Full document-reading AI isn't connected yet.";
  const fabImage=fab?.querySelector("img");if(fabImage){fabImage.src=avatar;fabImage.alt="Chisa assistant"}
- if(window.innerWidth>1160){panel.hidden=false;fab?.setAttribute("aria-expanded","true")}
+ if(window.innerWidth>1160&&(()=>{try{return sessionStorage.getItem("foxpdf-chisa-closed")!=="1"}catch(_){return true}})())setChisaOpen(true,false);
 }
 document.body.classList.add("fx-neon-dashboard");
 let mode="home",lastCount=app.documents().length,thumbToken=0;
@@ -182,7 +197,7 @@ $("fxTopConvert").onclick=()=>act("convert");
 $("fxTopProtect").onclick=()=>act("protect");
 $("fxTopBatch").onclick=()=>act("batch");
 $("fxTopCloud").onclick=()=>act("icloud");
-$("fxTopChat").onclick=()=>{panel.hidden=false;fab?.setAttribute("aria-expanded","true");$("question")?.focus()};
+$("fxTopChat").onclick=()=>setChisaOpen(true,true);
 $("fxHeroOpen").onclick=()=>app.open();
 $("fxHeroCreate").onclick=()=>app.create();
 $("fxViewFiles").onclick=()=>switchMode("editor");
@@ -206,7 +221,7 @@ window.addEventListener("foxpdf:change",()=>{
  recentRefresh();if(mode==="editor")thumbRefresh();
 });
 window.addEventListener("resize",()=>{
- if(window.innerWidth<=1160&&panel&&!panel.hidden&&document.activeElement!==$("question")){panel.hidden=true;fab?.setAttribute("aria-expanded","false")}
+ if(window.innerWidth<=1160&&panel&&!panel.hidden&&document.activeElement!==$("question"))setChisaOpen(false,false);
 });
 recentRefresh();switchMode("home");
 if(!window.pdfjsLib){
