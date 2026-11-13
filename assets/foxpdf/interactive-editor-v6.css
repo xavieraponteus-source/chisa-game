@@ -319,3 +319,37 @@ body.fx-mode-editor .fx-assistant .chat-head b{font-size:25px!important}
 
 /* Ensure browser hidden state always overrides mobile drawer styles. */
 #fxieThumbnails.fxie-mini-pages[hidden],.fxie-organizer-dimmer[hidden]{display:none!important}
+
+
+/* FXIE_DRAW_AND_SIGN_V13 — touch drawing, finger/Apple Pencil ink and prominent signing */
+.fxie-ink-options{display:none;gap:8px;align-items:center;justify-content:space-between;padding:8px 9px;background:#443828;border:1px solid #a48144;border-radius:9px;margin:5px 0}
+.fxie-root[data-mode=draw] .fxie-ink-options{display:flex}
+.fxie-ink-options label{font-size:12px;color:#ffe5b8;font-weight:750;display:flex;flex:1;gap:5px}
+.fxie-ink-options input{width:100%;accent-color:#dba751;touch-action:pan-x}
+.fxie-ink-options span{font-size:11px;min-width:38px;text-align:right;color:#f0d4a5}
+.fxie-root[data-mode=draw] .fxie-drawing{pointer-events:auto!important;touch-action:none!important;cursor:crosshair!important}
+.fxie-root[data-mode=draw] .fxie-textregion{pointer-events:none!important}
+.fxie-root[data-mode=draw] .fxie-sheet{touch-action:none}
+.fxie-ink-preview{display:block;position:absolute;inset:0;z-index:2;background:transparent;pointer-events:none;touch-action:none}
+.fxie-topright{gap:7px!important;flex-shrink:0}
+.fxie-topright #fxieDigitalSign{background:linear-gradient(120deg,#eec785,#b68743)!important;color:#1c1309!important;border:1px solid #ffe0a4!important;padding:8px 13px!important;border-radius:9px!important;font-size:12px!important;font-weight:850!important;box-shadow:0 0 9px #c18f334a!important}
+.fxie-topright #fxieDrawSignature{border:1px solid #927543!important;color:#f1d6a0!important;background:#382d20!important;border-radius:9px!important;padding:8px 11px!important;font-size:12px!important;white-space:nowrap!important}
+.fxie-topright #fxieDigitalSign:hover{filter:brightness(1.12)!important}
+.fxie-topbar{gap:8px!important}
+.fxie-topbar .fxie-filename{flex:1;min-width:20px;max-width:none!important}
+.fxie-editorbar #fxieDraw{font-size:13px!important;font-weight:750!important;min-width:62px!important}
+.fxie-root[data-mode=draw] #fxieDraw{background:#d7a95c!important;color:#1e1408!important}
+.fxie-tool[data-mode=draw].selected{background:#6a4a25!important;box-shadow:inset 3px 0 0 #f1c36a!important}
+@media(max-width:1100px){
+ .fxie-topbar .fxie-tabs{max-width:35%;overflow-x:auto;scrollbar-width:none}
+ .fxie-topbar .fxie-topright{gap:3px!important}
+ .fxie-topright #fxieDigitalSign,.fxie-topright #fxieDrawSignature{font-size:11px!important;padding:7px 8px!important}
+}
+@media(max-width:720px){
+ .fxie-topbar{min-height:55px;height:55px;padding:4px 6px!important}
+ .fxie-topbar .fxie-filename{display:none!important}
+ .fxie-topright #fxieDigitalSign{min-height:42px!important;padding:7px 8px!important;max-width:98px!important;white-space:normal!important;line-height:1.1!important}
+ .fxie-topright #fxieDrawSignature{min-height:42px!important;padding:7px!important;max-width:82px!important;white-space:normal!important;line-height:1.1!important}
+ .fxie-topbar .fxie-tabs{max-width:30%;flex:0 1 auto}
+ .fxie-root .fxie-topright #fxieSave{padding:9px 7px!important;min-height:42px!important;font-size:11px!important}
+}
