@@ -139,3 +139,10 @@ body.fx-neon-dashboard .fx-mode-editor .fx-recent{display:none}
 /* FOX_CHISA_GOLD_PORTRAIT_V1 */
 .fx-assistant .chat-head img{object-fit:cover!important;filter:sepia(.32) saturate(1.07) contrast(1.09)!important;border-color:#f4c87b!important;box-shadow:0 0 15px #e5b05b65!important}
 .fx-assistant .fx-chisa-illustration img{filter:sepia(.3) saturate(1.05)!important}
+
+/* FOX_KITSUNE_ART_V6 — white & gold mascot refinements */
+.fx-brand .fx-art-fox-logo{width:91px!important;height:62px!important;max-width:none!important;object-fit:contain!important;filter:drop-shadow(0 0 9px #ffbf57a8)!important}
+.fx-brand{gap:5px!important}
+.fx-assistant .chat-head img{object-fit:cover!important;background:radial-gradient(circle,#513319,#070707 78%)!important;filter:none!important;border:2px solid #f6c575!important;box-shadow:0 0 17px #efb85c7a!important}
+.fx-assistant .chat-fab img{object-fit:contain!important;background:#111!important}
+@media(max-width:790px){.fx-brand .fx-art-fox-logo{width:53px!important;height:41px!important}.fx-brand{gap:2px!important}}
