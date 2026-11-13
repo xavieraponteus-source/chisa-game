@@ -74,7 +74,11 @@ try{
  overlay.addEventListener("pointerdown",e=>{if(mode!=="highlight")return;drawing={start:point(e),end:point(e)};overlay.setPointerCapture(e.pointerId)});
  overlay.addEventListener("pointermove",e=>{if(!drawing)return;drawing.end=point(e);drawHighlightPreview(overlay)});
  overlay.addEventListener("pointerup",e=>{if(!drawing)return;drawing.end=point(e);const drag=drawing;drawing=null;overlay.replaceChildren();applyHighlight(drag)});
- $("fxieSheetWrap").replaceChildren(sheet);
+ const pageFrame=$("fxieSheetWrap");
+ if(splitPage){
+  const caption=el("div","fxie-left-spread-head","Page "+d.page+" · current");
+  pageFrame.replaceChildren(caption,sheet);
+ }else pageFrame.replaceChildren(sheet);
  if(lastPdf&&lastPdf!==reader)lastPdf.destroy?.();lastPdf=reader;
  rendered={scale,canvas,overlay,w:vp.width,h:vp.height,page:page,originalWidth:base.width,originalHeight:base.height};
  say("Page "+d.page+" · "+count+" selectable text regions");
@@ -653,7 +657,24 @@ async function setSplitView(pageNumber,refresh=false){
  if(splitPane&&splitPage===n&&!refresh){closeSplitView();return}
  splitPage=n;const token=++splitToken;
  const scroll=$("fxieScroll");
- if(!splitPane){splitPane=el("aside","fxie-split-pane");scroll.append(splitPane)}
+ if(!splitPane){
+  splitPane=el("aside","fxie-split-pane");
+  splitPane.setAttribute("aria-label","Right PDF page preview and drop area");
+  splitPane.addEventListener("dragover",event=>{
+   if(!draggedThumb&&!event.dataTransfer?.types.includes("text/plain"))return;
+   event.preventDefault();event.dataTransfer.dropEffect="copy";
+   splitPane.classList.add("fxie-split-dropready");
+  });
+  splitPane.addEventListener("dragleave",event=>{
+   if(!splitPane.contains(event.relatedTarget))splitPane.classList.remove("fxie-split-dropready");
+  });
+  splitPane.addEventListener("drop",event=>{
+   event.preventDefault();splitPane.classList.remove("fxie-split-dropready");
+   const dragged=Number((event.dataTransfer?.getData("text/plain")||"").match(/^foxpdf-page:(\d+)$/)?.[1])||draggedThumb;
+   if(dragged>0){draggedThumb=0;setSplitView(dragged,true)}
+  });
+  scroll.append(splitPane);
+ }
  scroll.classList.add("fxie-split-active");
  if(!refresh)requestAnimationFrame(draw);
  splitPane.replaceChildren();
