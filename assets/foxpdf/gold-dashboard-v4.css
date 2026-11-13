@@ -173,3 +173,62 @@ body.fx-mode-editor .fx-assistant.chat-widget.fx-chat-collapsed .chat-fab{
 @keyframes fxGoldBreath{from{filter:drop-shadow(0 0 3px #eeac5488)}to{filter:drop-shadow(0 0 13px #ffe0a3)}}
 @media(prefers-reduced-motion:reduce){.fx-brand .fx-art-fox-logo{animation:none!important}}
 @media(max-width:620px){.fx-assistant.chat-widget.fx-chat-collapsed,body.fx-mode-editor .fx-assistant.chat-widget.fx-chat-collapsed{right:10px!important;bottom:12px!important;width:62px!important;height:62px!important}.fx-assistant.chat-widget.fx-chat-collapsed .chat-fab{width:62px!important;height:62px!important}}
+
+
+/* FOXPDF_GLOBAL_TOUCH_V12 — comfortable touch across the dashboard, chat and tools */
+@media (pointer:coarse),(any-pointer:coarse){
+ body.fx-neon-dashboard button:not(.fxie-textregion),
+ body.fx-neon-dashboard select,
+ body.fx-neon-dashboard a,
+ body.fx-neon-dashboard input[type=button],
+ body.fx-neon-dashboard input[type=submit]{
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:rgba(229,176,91,.22);
+ }
+ body.fx-neon-dashboard .fx-top-nav button,
+ body.fx-neon-dashboard .fx-top-nav a,
+ body.fx-neon-dashboard .fx-rail button,
+ body.fx-neon-dashboard .fx-recent-head button,
+ body.fx-neon-dashboard .fx-hero-buttons button,
+ body.fx-neon-dashboard .fx-file-toolbar button,
+ body.fx-neon-dashboard .fx-edit-tools button,
+ body.fx-neon-dashboard .fx-tool-grid button,
+ body.fx-neon-dashboard .fx-assistant .chat-panel button,
+ body.fx-neon-dashboard .fx-assistant .quick button,
+ body.fx-neon-dashboard .fx-assistant .chat-fab,
+ body.fx-neon-dashboard .fox-advanced button,
+ body.fx-neon-dashboard .fx-review-button{
+  min-height:44px!important;
+ }
+ body.fx-neon-dashboard .fx-tool-grid button{transform:none!important}
+ body.fx-neon-dashboard :is(.fx-rail,.fx-top-nav,.fx-tool-grid,.fx-recent,.fx-assistant .quick,.fx-assistant .messages,.workspace .tools){
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-x:contain;
+ }
+ body.fx-neon-dashboard input[type=text],body.fx-neon-dashboard input[type=search],
+ body.fx-neon-dashboard input[type=number],body.fx-neon-dashboard input[type=email],
+ body.fx-neon-dashboard input[type=password],body.fx-neon-dashboard textarea,
+ body.fx-neon-dashboard select{font-size:max(16px,1rem)!important}
+}
+@media(max-width:790px){
+ .fx-neon-dashboard .site-nav.fx-top{overflow:visible!important}
+ .fx-top-nav{display:flex!important;min-width:0!important;max-width:100%!important;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:none!important;-webkit-overflow-scrolling:touch!important;flex-wrap:nowrap!important}
+ .fx-top-nav::-webkit-scrollbar{display:none}
+ .fx-top-nav > button,.fx-top-nav > a{flex:0 0 auto!important;white-space:nowrap!important}
+ .fx-rail{touch-action:pan-x!important;scroll-snap-type:x proximity}
+ .fx-rail button{scroll-snap-align:start;flex-shrink:0!important}
+ .fx-assistant.chat-widget:not(.fx-chat-collapsed){max-height:calc(100dvh - 78px)!important;max-width:calc(100vw - 20px)!important}
+ .fx-assistant .chat-panel{overscroll-behavior:contain!important}
+ .fx-recent-head{flex-wrap:wrap!important;gap:6px!important}
+ .fx-hero-buttons{gap:9px!important}
+}
+@media(max-width:540px){
+ .fx-top-nav{gap:5px!important}
+ .fx-home-hero .fx-hero-buttons button{min-height:46px!important}
+ .fx-recent-head button{min-width:44px!important}
+ .fx-assistant .quick button{min-height:44px!important;white-space:normal!important}
+}
+@media(prefers-reduced-motion:reduce){
+ .fx-brand .fx-art-fox-logo{animation:none!important}
+ .fx-neon-dashboard *{scroll-behavior:auto!important}
+}
