@@ -1315,7 +1315,7 @@ function currentZoom(){return zoom==="fit"?(rendered?.scale||1):Number(zoom)}
 function scaleBy(v){const factor=Math.max(.5,Math.min(2.5,currentZoom()*v));zoom=String(Math.round(factor*100)/100);const z=$("fxieZoom");if(![...z.options].some(o=>o.value===zoom))z.add(new Option(Math.round(factor*100)+"%",zoom));z.value=zoom;draw()}
 bind("fxieMinus",()=>scaleBy(.8));bind("fxiePlus",()=>scaleBy(1.25));
 bind("fxieUndo",async()=>{await fxieMutationChain;if(!undo.length)return say("Nothing to undo.");const d=app.readCurrent();redo.push(d.bytes.slice());const previous=undo.pop();fxieHistoryBytes-=previous.byteLength;await app.replace(previous);say("Last change undone.")});
-bind("fxieRedo",async()=>{await fxieMutationChain;if(!redo.length)return say("Nothing to redo.");const d=app.readCurrent();fxieRememberUndo(d.bytes);await app.replace(redo.pop());say("Change restored.")});
+bind("fxieRedo",async()=>{await fxieMutationChain;if(!redo.length)return say("Nothing to redo.");const d=app.readCurrent();const next=redo.pop();fxieRememberUndo(d.bytes);await app.replace(next);say("Change restored.")});
 bind("fxieInfo",()=>alert("The FoxPDF editor renders pages and selectable text blocks. Original paragraph editing uses guarded server processing and may reject font-complex layouts. Permanent redaction is a separate, secure operation."));
 window.addEventListener("foxpdf:change",()=>{const d=app.current();if(d){$("fxieFilename").textContent=d.name;$("fxieCount").textContent=d.page+" / "+d.pages;if(historyName!==d.name){undo=[];redo=[];fxieHistoryBytes=0;historyName=d.name}}if(!mini.hidden&&d){
  if(d.bytes!==thumbRenderedSource){
