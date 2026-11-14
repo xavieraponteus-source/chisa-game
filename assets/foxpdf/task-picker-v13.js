@@ -206,7 +206,7 @@ function actOnSelected(type){
   case "split":splitPanel();return;
   case "ocr":readyPanel(type,()=>app.advanced("ocr"),"OCR requires FoxPDF's Railway processing service. The selected PDF is uploaded only after you choose Run OCR.","Run OCR");return;
   case "convert":readyPanel(type,()=>app.advanced("convert"),"Export uses FoxPDF's Railway processor. Choose the export format after continuing.","Choose export format");return;
-  case "redact":readyPanel(type,()=>app.advanced("redact"),"Permanent redaction is processed by Railway. Enter the exact text to remove when prompted.","Start permanent redaction");return;
+  case "redact":readyPanel(type,()=>{if(!window.FoxPDFIntegrity)throw Error("The verified redaction tools are loading. Refresh FoxPDF and try again.");window.FoxPDFIntegrity.open("redact")},"Create a separate, image-only sanitized copy with OCR phrase detection and structural checks. Your original stays unchanged.","Choose redaction options");return;
   case "protect":readyPanel(type,()=>app.advanced("encrypt"),"Password encryption uses FoxPDF's Railway processor. You'll choose a password next.","Set password");return;
   case "compress":readyPanel(type,()=>app.advanced("compress"),"Compression runs on FoxPDF's Railway processor and requires a temporary upload.","Compress PDF");return;
   case "form":readyPanel(type,()=>app.click("fillPdf"),"Fill the form in the selected PDF. Form changes are applied to your working copy.","Open fill tools");return;

@@ -5,9 +5,9 @@ ready(()=>{
 const app=window.FoxPDFBridge;if(!app)return;
 const make=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};
 const css=document.createElement("link");css.rel="stylesheet";css.href="/fox-assets/integrity-tools-v1.css?v=1.0";document.head.append(css);
-let modal=null,lastFocus=null;
+let modal=null,lastFocus=null,keyTrap=null;
 const same=(a,b)=>!!a&&!!b&&a.name===b.name&&a.bytes.length===b.bytes.length&&a.bytes.every((v,i)=>v===b.bytes[i]);
-function close(){modal?.remove();modal=null;lastFocus?.focus?.()}
+function close(){if(keyTrap)document.removeEventListener("keydown",keyTrap,true);keyTrap=null;modal?.remove();modal=null;lastFocus?.focus?.()}
 function button(text,action,primary=false){const e=make("button",text,primary?"fxi-primary":"");e.type="button";e.onclick=action;return e}
 function field(label,control){const e=make("label");e.append(make("span",label),control);return e}
 function select(choices){const e=make("select");for(const [value,label] of choices){const o=make("option",label);o.value=value;e.append(o)}return e}
@@ -17,7 +17,7 @@ function dialog(title){
  const header=make("header");header.append(make("h2",title),button("Close",close));
  const body=make("div",undefined,"fxi-body"),status=make("p","Ready.","fxi-status");status.setAttribute("role","status");status.setAttribute("aria-live","polite");
  box.append(header,body,status);modal.append(box);document.body.append(modal);
- box.addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault();close()}if(e.key==="Tab"){const nodes=[...box.querySelectorAll("button,input,select,textarea,a[href]")].filter(n=>!n.disabled&&!n.hidden);if(!nodes.length)return;const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});
+ keyTrap=e=>{if(!modal)return;if(e.key==="Escape"){e.preventDefault();e.stopPropagation();close();return}if(e.key==="Tab"){const nodes=[...box.querySelectorAll("button,input,select,textarea,a[href]")].filter(n=>!n.disabled&&!n.hidden);if(!nodes.length)return;const first=nodes[0],last=nodes.at(-1);if(!box.contains(document.activeElement)){e.preventDefault();first.focus()}else if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}};document.addEventListener("keydown",keyTrap,true);
  header.querySelector("button").focus();return {body,status,box,root:modal};
 }
 async function request(source,path,operation,params){
@@ -33,7 +33,7 @@ async function installCopy(source,response,suffix){
  if(pdf.getPageCount()!==source.count)throw Error("The returned copy has a different page count. It was not opened.");
  let report={};try{report=JSON.parse(response.headers.get("x-foxpdf-details")||"{}")}catch{}
  const name=source.name.replace(/\.pdf$/i,"")+suffix+".pdf";
- const index=await app.addDocument(name,bytes);app.select(index);return report;
+ const index=await app.addDocument(name,bytes);await app.select(index);modal?.querySelector("button")?.focus();return report;
 }
 function reportView(body,report){
  const details=make("details",undefined,"fxi-report");details.append(make("summary","Verification details"));
@@ -62,7 +62,7 @@ function edit(){
    const report=await installCopy(initial,response,"-precise-edit");ui.status.textContent="Edited copy opened. Original font and surrounding layout verified; review the result, then Save PDF.";reportView(ui.body,report);
   }catch(e){ui.status.textContent=e.message}finally{apply.disabled=false}},true);
   ui.body.append(field("Page",page),field("Original text run",run),metadata,field("Replacement text",replacement),field("Allow a smaller font to fit the original space (minimum 6 pt)",fit),apply);
-  load.remove();
+  load.remove();ui.status.textContent="Layout inspected. Select an original text run and enter its replacement.";
  }catch(e){ui.status.textContent=e.message;load.disabled=false}},true);ui.body.append(load);
 }
 function redact(){
