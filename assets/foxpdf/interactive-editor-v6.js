@@ -915,12 +915,14 @@ function findOccurrences(value,query,whole,caseSensitive){
 function findMarkPage(sheet,page,scale){
  if(!sheet)return;
  sheet.querySelectorAll(".fxie-find-highlight").forEach(x=>x.remove());
+ if(findBox.hidden)return;
  const selection=fxieFind.hits[fxieFind.index];
  for(let i=0;i<fxieFind.hits.length;i++){
   const m=fxieFind.hits[i];if(m.page!==page)continue;
   const hit=el("span","fxie-find-highlight");
   const x=m.x*scale,y=m.top*scale,width=m.width*scale,height=m.height*scale;
   Object.assign(hit.style,{left:x+"px",top:y+"px",width:Math.max(5,width)+"px",height:Math.max(7,height)+"px",background:i===fxieFind.index?"#ff9825a6":"#fce85677",borderColor:i===fxieFind.index?"#fb6815":"#d69e2d"});
+  if(!findBox.hidden){hit.style.setProperty("pointer-events","auto","important");hit.title="Select occurrence "+(i+1);hit.addEventListener("click",e=>{e.stopPropagation();findSelect(i)})}
   sheet.append(hit);
  }
 }
@@ -1003,8 +1005,8 @@ async function findReplace(onlyCurrent){
  },"Replaced "+targets.length+" visible occurrence(s). Review the result and save.");
  if(ok){await findScan();say("Replacements applied. Original text may still be searchable; not secure redaction.")}
 }
-bind("fxieSearch",()=>{findBox.hidden=!findBox.hidden;if(!findBox.hidden){findEl("fxFindWord").focus();if(fxieFind.query)findScan()}});
-findEl("fxFindClose").onclick=()=>{findBox.hidden=true};
+bind("fxieSearch",()=>{findBox.hidden=!findBox.hidden;if(!findBox.hidden){findEl("fxFindWord").focus();if(fxieFind.query)findScan()}else findRefreshVisible()});
+findEl("fxFindClose").onclick=()=>{findBox.hidden=true;findRefreshVisible()};
 findEl("fxFindRun").onclick=findScan;
 findEl("fxFindPrevious").onclick=()=>findSelect(fxieFind.index-1);
 findEl("fxFindNext").onclick=()=>findSelect(fxieFind.index+1);
