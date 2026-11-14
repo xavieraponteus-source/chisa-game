@@ -24,9 +24,10 @@ view.innerHTML=[
 main.append(view);
 let mode="select",zoom="fit",renderVersion=0,rendered=null,selected=null,inspectCache=null,consentKey="",undo=[],redo=[],historyName="",pendingImage=null,drawing=null,lastPdf=null,inkStroke=null;
 let moveSession=null,dragTextHandle=null; // Last locally applied text remains repositionable.
+let inkSession=null; // Most recently drawn stroke, movable and resizable.
 const say=(message,bad=false)=>{const s=$("fxieStatus");s.textContent=message;s.dataset.bad=bad?"1":"0"};
 function check(){const d=app.current();if(!d){app.say("Please open a PDF first.");app.open();return null}return d}
-function setMode(m){mode=m;view.classList.remove("fxie-drawer-closed");view.dataset.mode=m;selected=null;closeInline();const sheet=$("fxieSheetWrap").querySelector(".fxie-sheet");if(sheet)showMovableText(sheet);$("fxieReplaceBox").hidden=true;$("fxieInsertBox").hidden=m!=="text";for(const b of view.querySelectorAll("[data-mode]"))b.classList.toggle("selected",b.dataset.mode===m);for(const [id,key] of [["fxieSelect","select"],["fxieText","text"],["fxieImage","image"],["fxieHighlight","highlight"],["fxieDraw","draw"]])$(id).classList.toggle("selected",m===key);
+function setMode(m){mode=m;view.classList.remove("fxie-drawer-closed");view.dataset.mode=m;selected=null;closeInline();const sheet=$("fxieSheetWrap").querySelector(".fxie-sheet");if(sheet){showMovableText(sheet);showMovableInk(sheet);}$("fxieReplaceBox").hidden=true;$("fxieInsertBox").hidden=m!=="text";for(const b of view.querySelectorAll("[data-mode]"))b.classList.toggle("selected",b.dataset.mode===m);for(const [id,key] of [["fxieSelect","select"],["fxieText","text"],["fxieImage","image"],["fxieHighlight","highlight"],["fxieDraw","draw"]])$(id).classList.toggle("selected",m===key);
 say(({select:"Select a text region on the page.",edit:"Click existing text to edit its paragraph.",text:"Enter text on the left, then click the page.",image:"Choose a picture, then click where it should go.",highlight:"Drag across a region on the page.",draw:"Draw on the PDF using your finger, mouse, or stylus. Tap Save PDF afterward."})[m]);if(m==="image"&&!pendingImage)$("fxieImageFile").click()}
 async function getJs(){if(window.pdfjsLib)return window.pdfjsLib;if(!window.fxieJS)window.fxieJS=new Promise((resolve,reject)=>{const script=document.createElement("script");script.src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";script.onload=()=>{if(!window.pdfjsLib)return reject(Error("PDF renderer not found"));pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";resolve(pdfjsLib)};script.onerror=()=>reject(Error("PDF renderer could not load"));document.head.append(script)});return window.fxieJS}
 function point(e){if(!rendered)return null;const r=rendered.canvas.getBoundingClientRect();if(!r.width||!r.height)return null;return{x:(e.clientX-r.left)/r.width*rendered.w,y:(e.clientY-r.top)/r.height*rendered.h}}
@@ -87,7 +88,7 @@ try{
  }else pageFrame.replaceChildren(sheet);
  if(lastPdf&&lastPdf!==reader)lastPdf.destroy?.();lastPdf=reader;
  rendered={scale,canvas,overlay,w:vp.width,h:vp.height,page:page,originalWidth:base.width,originalHeight:base.height};
- showMovableText(sheet);
+ showMovableText(sheet);showMovableInk(sheet);
  say("Page "+d.page+" · "+count+" selectable text regions");
 }catch(e){$("fxieSheetWrap").replaceChildren(el("p","fxie-error","Unable to show page: "+e.message));say("PDF rendering failed: "+e.message,true)}
 }
@@ -260,25 +261,47 @@ function cancelInk(event){
  if(!inkStroke||inkStroke.pointerId!==event.pointerId)return;
  const stroke=inkStroke;inkStroke=null;stroke.canvas.remove();
 }
-async function finishInk(event){
- const state=inkStroke;if(!state||state.pointerId!==event.pointerId)return;
- moveInk(event);inkStroke=null;
- const pageNumber=state.page,points=state.points.slice(),thickness=state.thickness,paint=state.color;
- state.canvas.remove();
- if(!points.length||pageNumber!==app.current()?.page)return;
- const hex=paint.replace("#",""),ink=PDFLib.rgb(parseInt(hex.slice(0,2),16)/255,parseInt(hex.slice(2,4),16)/255,parseInt(hex.slice(4,6),16)/255);
- await mutate(async pdf=>{
-  const page=pdf.getPage(pageNumber-1);
-  if(page.getRotation().angle%360!==0)throw Error("Drawing directly on rotated PDF pages is not supported yet.");
-  const toPdf=p=>({x:p.x/state.scale,y:page.getHeight()-p.y/state.scale});
-  if(points.length===1){
-   const p=toPdf(points[0]);page.drawCircle({x:p.x,y:p.y,size:Math.max(.3,thickness/2),color:ink});return;
-  }
-  for(let i=1;i<points.length;i++){
-   const a=toPdf(points[i-1]),b=toPdf(points[i]);
-   page.drawLine({start:a,end:b,thickness,color:ink});
-  }
- },"Drawing added to page "+pageNumber+". Choose Save PDF to download.");
+
+/* FXIE_RESIZABLE_INK_V15 — select, drag, resize drawn strokes directly on PDF.
+   Recompose from the pre-stroke PDF so repeated moves never duplicate ink. */
+function inkRect(points,thickness,w,h){
+ const xs=points.map(p=>p.x),ys=points.map(p=>p.y),pad=Math.max(4,thickness*.5+4);
+ const loX=Math.min(...xs),hiX=Math.max(...xs),loY=Math.min(...ys),hiY=Math.max(...ys);
+ const x=Math.max(0,Math.min(w-4,loX-pad)),y=Math.max(0,Math.min(h-4,loY-pad));
+ return {x,y,width:Math.max(10,Math.min(w-x,Math.max(28,hiX-loX+pad*2))),
+  height:Math.max(10,Math.min(h-y,Math.max(26,hiY-loY+pad*2)))};
+}
+function inkConstrain(b,w,h){
+ const width=Math.max(12,Math.min(w,b.width)),height=Math.max(12,Math.min(h,b.height));
+ return {x:Math.max(0,Math.min(w-width,b.x)),y:Math.max(0,Math.min(h-height,b.y)),width,height};
+}
+function paintInkSession(doc,state){
+ const page=doc.getPage(state.page-1);
+ if(page.getRotation().angle%360!==0)throw Error("Drawing edits on rotated pages are not supported yet.");
+ const from=state.original,to=state.box,ink=textInk(state.hex);
+ const mapped=state.points.map(p=>({x:to.x+(p.x-from.x)*to.width/Math.max(1,from.width),
+  y:to.y+(p.y-from.y)*to.height/Math.max(1,from.height)}));
+ const weight=Math.max(.35,Math.min(30,state.thickness*Math.sqrt(to.width/from.width*to.height/from.height)));
+ if(mapped.length===1){page.drawCircle({x:mapped[0].x,y:mapped[0].y,size:Math.max(.4,weight/2),color:ink});return}
+ for(let k=1;k<mapped.length;k++)page.drawLine({start:mapped[k-1],end:mapped[k],thickness:weight,color:ink});
+}
+async function finishInk(e){
+ const state=inkStroke;if(!state||state.pointerId!==e.pointerId)return;
+ moveInk(e);inkStroke=null;state.canvas.remove();
+ if(!state.points.length||state.page!==app.current()?.page||!rendered)return;
+ const previous=app.readCurrent();if(!previous)return;
+ const w=rendered.originalWidth,h=rendered.originalHeight;
+ const coords=state.points.map(p=>({x:Math.max(0,Math.min(w,p.x/state.scale)),y:Math.max(0,Math.min(h,h-p.y/state.scale))}));
+ const original=inkRect(coords,state.thickness,w,h);
+ const session={name:previous.name,page:state.page,baseBytes:previous.bytes.slice(),
+  latestBytes:null,original,box:{...original},points:coords,thickness:state.thickness,hex:state.color,busy:false};
+ const ok=await mutate(async pdf=>paintInkSession(pdf,session),
+   "Drawing added. Drag the blue selection to move it or resize using its handles.");
+ if(!ok)return;
+ moveSession=null;inkSession=session;
+ session.latestBytes=app.readCurrent()?.bytes.slice()||null;
+ setMode("select");
+ const sheet=$("fxieSheetWrap").querySelector(".fxie-sheet");if(sheet)showMovableInk(sheet);
 }
 $("fxiePenWidth").oninput=event=>{$("fxiePenLabel").textContent=Number(event.target.value).toFixed(1)+" pt"};
 
@@ -484,6 +507,112 @@ function showMovableText(sheet){
  frame.addEventListener("pointerup",e=>stop(e,false));
  frame.addEventListener("pointercancel",e=>stop(e,true));
  frame.addEventListener("lostpointercapture",e=>{if(drag&&e.pointerId===drag.id)stop(e,true)});
+ sheet.append(frame);
+}
+
+
+function showMovableInk(sheet){
+ sheet.querySelector(".fxie-ink-selection")?.remove();
+ const state=inkSession,d=app.current();
+ if(!state||!d||!rendered||!state.latestBytes||state.name!==d.name||state.page!==d.page)return;
+ if(["draw","highlight","image","text"].includes(mode))return;
+ if(!equalBytes(currentBytes(),state.latestBytes)){inkSession=null;return}
+ const sc=rendered.scale,h=rendered.originalHeight,b=state.box;
+ const frame=el("div","fxie-ink-selection");
+ frame.setAttribute("role","group");frame.setAttribute("aria-label","Drawing selected; drag to move or resize");
+ const toolbar=el("div","fxie-ink-toolbar");
+ const button=(label,cls,title)=>{
+  const a=el("button","fxie-ink-control "+cls,label);a.type="button";a.title=title;
+  a.setAttribute("aria-label",title);return a;
+ };
+ const move=button("⠿ Move","fxie-ink-move","Drag here to move drawing");
+ const smaller=button("−","fxie-ink-small","Make drawing smaller");
+ const bigger=button("+","fxie-ink-big","Make drawing bigger");
+ const more=button("✎","fxie-ink-more","Draw another stroke");
+ const done=button("✓","fxie-ink-done","Finish adjusting drawing");
+ const remove=button("⌫","fxie-ink-delete","Remove the selected drawing");
+ toolbar.append(move,smaller,bigger,more,done,remove);
+ const width=button("↔","fxie-ink-grip fxie-ink-width","Drag horizontally to resize drawing width");
+ const height=button("↕","fxie-ink-grip fxie-ink-height","Drag vertically to resize drawing height");
+ const corner=button("⤡","fxie-ink-grip fxie-ink-corner","Drag corner to resize width and height");
+ frame.append(toolbar,width,height,corner);
+ function updatePosition(){
+  const b=state.box;frame.style.left=(b.x*sc)+"px";frame.style.top=((h-b.y-b.height)*sc)+"px";
+  frame.style.width=(b.width*sc)+"px";frame.style.height=(b.height*sc)+"px";
+ }
+ updatePosition();
+ let interaction=null;
+ frame.addEventListener("pointerdown",e=>{
+  if(e.pointerType==="mouse"&&e.button!==0)return;
+  if(e.target.closest(".fxie-ink-control:not(.fxie-ink-move)"))return;
+  const type=e.target.closest(".fxie-ink-corner")?"free":e.target.closest(".fxie-ink-width")?"width":e.target.closest(".fxie-ink-height")?"height":"move";
+  e.preventDefault();e.stopPropagation();
+  interaction={id:e.pointerId,type,clientX:e.clientX,clientY:e.clientY,rect:{...state.box}};
+  try{frame.setPointerCapture(e.pointerId)}catch(_){}
+  frame.classList.add("fxie-ink-dragging");
+ });
+ frame.addEventListener("pointermove",e=>{
+  const v=interaction;if(!v||v.id!==e.pointerId)return;
+  e.preventDefault();e.stopPropagation();
+  const dx=(e.clientX-v.clientX)/sc,dy=(e.clientY-v.clientY)/sc,old=v.rect,rect={...old};
+  if(v.type==="move"){rect.x+=dx;rect.y-=dy}
+  if(v.type==="width"||v.type==="free")rect.width=Math.max(12,old.width+dx);
+  if(v.type==="height"||v.type==="free"){rect.height=Math.max(12,old.height+dy);rect.y=old.y-dy}
+  state.box=inkConstrain(rect,rendered.originalWidth,rendered.originalHeight);
+  updatePosition();
+ });
+ async function commit(next,previous,description){
+  if(state.busy)return;
+  if(!equalBytes(currentBytes(),state.latestBytes)){
+   frame.remove();inkSession=null;say("PDF changed. Draw again to select a new stroke.",true);return;
+  }
+  state.busy=true;frame.classList.add("fxie-ink-busy");
+  try{
+   const doc=await PDFLib.PDFDocument.load(state.baseBytes.slice());
+   state.box=inkConstrain(next,doc.getPage(state.page-1).getWidth(),doc.getPage(state.page-1).getHeight());
+   paintInkSession(doc,state);
+   const updated=new Uint8Array(await doc.save({useObjectStreams:true}));
+   if(!equalBytes(currentBytes(),state.latestBytes))throw Error("PDF changed while adjusting drawing");
+   const old=app.readCurrent()?.bytes;
+   if(old?.length<8*1024*1024){undo.push(old.slice());if(undo.length>7)undo.shift();redo=[]}
+   state.latestBytes=updated.slice();
+   await app.replace(updated);
+   say(description||"Drawing updated. Move or resize it again, then Save PDF.");
+   const now=$("fxieSheetWrap").querySelector(".fxie-sheet");if(now)showMovableInk(now);
+  }catch(err){
+   state.box={...previous};updatePosition();
+   say("Couldn't adjust drawing: "+err.message,true);
+  }finally{state.busy=false;frame.classList.remove("fxie-ink-busy")}
+ }
+ frame.addEventListener("pointerup",e=>{
+  if(!interaction||interaction.id!==e.pointerId)return;
+  e.preventDefault();e.stopPropagation();
+  const v=interaction;interaction=null;frame.classList.remove("fxie-ink-dragging");
+  const changed=Object.keys(state.box).some(k=>Math.abs(state.box[k]-v.rect[k])>.3);
+  if(changed)commit({...state.box},v.rect,"Drawing position and size saved in PDF.");
+ });
+ frame.addEventListener("pointercancel",e=>{
+  if(interaction?.id!==e.pointerId)return;state.box={...interaction.rect};interaction=null;
+  frame.classList.remove("fxie-ink-dragging");updatePosition();
+ });
+ frame.addEventListener("lostpointercapture",e=>{
+  if(interaction?.id!==e.pointerId)return;
+  const v=interaction;interaction=null;
+  if(Object.keys(state.box).some(k=>Math.abs(state.box[k]-v.rect[k])>.3))commit({...state.box},v.rect,"Drawing adjusted.");
+ });
+ const stopEvent=e=>{e.preventDefault();e.stopPropagation()};
+ for(const a of [smaller,bigger,more,done,remove])a.addEventListener("pointerdown",stopEvent);
+ bigger.onclick=e=>{stopEvent(e);const prior={...state.box},cx=prior.x+prior.width/2,cy=prior.y+prior.height/2;const next=inkConstrain({x:cx-prior.width*.575,y:cy-prior.height*.575,width:prior.width*1.15,height:prior.height*1.15},rendered.originalWidth,rendered.originalHeight);state.box=next;updatePosition();commit(next,prior,"Drawing enlarged and saved.")};
+ smaller.onclick=e=>{stopEvent(e);const prior={...state.box},cx=prior.x+prior.width/2,cy=prior.y+prior.height/2;const next=inkConstrain({x:cx-prior.width*.44,y:cy-prior.height*.44,width:prior.width*.88,height:prior.height*.88},rendered.originalWidth,rendered.originalHeight);state.box=next;updatePosition();commit(next,prior,"Drawing made smaller and saved.")};
+ done.onclick=e=>{stopEvent(e);frame.remove();say("Drawing saved. Download the PDF to keep your changes.")};
+ more.onclick=e=>{stopEvent(e);inkSession=null;frame.remove();setMode("draw");say("Draw your next stroke. It will be selected automatically.")};
+ remove.onclick=async e=>{
+  stopEvent(e);if(state.busy||!equalBytes(currentBytes(),state.latestBytes))return;
+  const previous=app.readCurrent()?.bytes.slice();if(!previous)return;
+  if(previous.length<8*1024*1024){undo.push(previous);if(undo.length>7)undo.shift();redo=[]}
+  inkSession=null;frame.remove();await app.replace(state.baseBytes.slice());
+  say("Drawing removed. Use Undo if you want it back.");
+ };
  sheet.append(frame);
 }
 
