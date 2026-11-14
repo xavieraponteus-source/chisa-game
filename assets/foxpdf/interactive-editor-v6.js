@@ -891,7 +891,7 @@ bind("fxieSave",()=>app.save());bind("fxieShare",()=>app.share());bind("fxiePrin
 bind("fxieAdvanced",()=>window.FoxPDFPro?window.FoxPDFPro.open("tools"):say("Advanced tools are loading. Please try again.",true));bind("fxieChisa",()=>window.FoxPDFChisaToggle?window.FoxPDFChisaToggle(true,true):$("chat").hidden=false);bind("fxieComments",()=>window.FoxPDFPro?.open("annotate"));
 
 /* FIND ALL / REPLACE ONE / REPLACE ALL — local visual edits, never secure redaction. */
-const fxieFind={query:"",hits:[],index:0,serial:0,documentName:""};
+const fxieFind={query:"",hits:[],index:0,serial:0,documentName:"",documentBytes:null};
 const findBox=el("aside","fxie-search-panel");
 findBox.hidden=true;
 findBox.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between"><strong>Find & Replace</strong><button type="button" id="fxFindClose">✕</button></div><label>Search word or phrase<input id="fxFindWord" type="text" autocomplete="off" placeholder="Enter any word"></label><label>Replace with<input id="fxFindWith" type="text" placeholder="Replacement text"></label><label><input id="fxFindWhole" type="checkbox" checked> Whole word only</label><label><input id="fxFindCase" type="checkbox"> Match case</label><div class="fxie-search-actions"><button id="fxFindRun">Find all</button><button id="fxFindPrevious">‹ Previous</button><button id="fxFindNext">Next ›</button></div><div id="fxFindCount" role="status" aria-live="polite">Enter a word to search.</div><div class="fxie-search-actions"><button id="fxFindOne">Replace this</button><button id="fxFindAll">Replace all</button></div><div id="fxFindList" class="fxie-search-pages"></div><p class="fxie-search-note">Search works on selectable text in your PDF. Image-only pages require OCR first. This local replacement visually covers matched text and adds new text; original content may still exist in the PDF. It is not redaction. Formatting may change.</p>';
@@ -953,11 +953,13 @@ function findSelect(i){
 }
 async function findScan(){
  const query=findEl("fxFindWord").value.trim();
- fxieFind.query=query;fxieFind.hits=[];fxieFind.index=0;
+ fxieFind.query=query;fxieFind.hits=[];fxieFind.index=0;fxieFind.documentBytes=null;
+ findCount();
  const seq=++fxieFind.serial;
  if(!query){findEl("fxFindCount").textContent="Enter a word to search.";findRefreshVisible();return}
  const file=app.readCurrent();if(!file)return say("Open a PDF first.",true);
  fxieFind.documentName=file.name;
+ const sourceBytes=file.bytes.slice(),hits=[];
  findEl("fxFindCount").textContent="Searching every page…";
  try{
   const lib=await getJs(),reader=await lib.getDocument({data:file.bytes.slice()}).promise;
@@ -973,25 +975,35 @@ async function findScan(){
     const matches=findOccurrences(item.str,query,whole,caseSensitive);
     for(const [start,end] of matches){
      const portionStart=start/item.str.length,portionLength=(end-start)/item.str.length;
-     fxieFind.hits.push({page,start,end,str:item.str,x:transform[4]+itemWidth*portionStart,top:transform[5]-fontHeight,width:itemWidth*portionLength,height:fontHeight,
+     hits.push({page,start,end,str:item.str,x:transform[4]+itemWidth*portionStart,top:transform[5]-fontHeight,width:itemWidth*portionLength,height:fontHeight,
       baseline:transform[5],itemX:transform[4],itemWidth,fontHeight,pageWidth:viewport.width,pageHeight:viewport.height});
     }
    }
   }
   reader.destroy();
   if(seq!==fxieFind.serial)return;
+  const live=app.readCurrent();
+  if(!live||live.name!==file.name||!equalBytes(live.bytes,sourceBytes)){
+   findEl("fxFindCount").textContent="Document changed during search. Run Find all again.";return;
+  }
+  fxieFind.hits=hits;fxieFind.documentBytes=sourceBytes;
   findCount();
  }catch(err){findEl("fxFindCount").textContent="Search unavailable: "+String(err?.message||err);say("Search failed.",true)}
 }
 async function findReplace(onlyCurrent){
  const replacement=findEl("fxFindWith").value;
  const targets=onlyCurrent?[fxieFind.hits[fxieFind.index]]:fxieFind.hits.slice();
- if(!targets.length)return;
+ if(!targets.length||!targets[0])return;
  if(!onlyCurrent&&!confirm("Replace all "+targets.length+" visible text match(es) in this PDF? Complex formatting may change, and this does not securely erase original text."))return;
- const before=app.readCurrent();if(!before||before.name!==fxieFind.documentName)return;
+ const before=app.readCurrent();
+ if(!before||before.name!==fxieFind.documentName||!equalBytes(before.bytes,fxieFind.documentBytes)){
+  say("Document changed since this search. Run Find all again before replacing text.",true);return;
+ }
  const replacementFont=String(findEl("fxieFont")?.value||"Helvetica");
  const expected=before.bytes.slice();
  const ok=await mutate(async pdf=>{
+  const current=app.readCurrent();
+  if(!current||current.name!==before.name||!equalBytes(current.bytes,expected))throw Error("Document changed before replacement. Run Find all again.");
   if(pdf.getPageCount()<Math.max(...targets.map(t=>t.page)))throw Error("Pages changed");
   // Batch all matches into one PDF write and one undo step. These edits are visual,
   // not true content-stream replacement or secure removal.
@@ -1015,6 +1027,10 @@ findEl("fxFindPrevious").onclick=()=>findSelect(fxieFind.index-1);
 findEl("fxFindNext").onclick=()=>findSelect(fxieFind.index+1);
 findEl("fxFindOne").onclick=()=>findReplace(true);
 findEl("fxFindAll").onclick=()=>findReplace(false);
+findEl("fxFindWord").oninput=()=>{
+ ++fxieFind.serial;fxieFind.hits=[];fxieFind.index=0;fxieFind.documentBytes=null;
+ findCount();findEl("fxFindCount").textContent="Search changed. Run Find all before replacing text.";
+};
 findEl("fxFindWord").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();findScan()}};
 for(const id of ["fxFindWhole","fxFindCase"])findEl(id).onchange=()=>{if(fxieFind.query)findScan()};
 bind("fxieProperties",()=>window.FoxPDFPro?.open("metadata"));bind("fxieMarkup",()=>window.FoxPDFPro?.open("annotate"));
@@ -1721,3 +1737,4 @@ window.FoxPDFInteractiveEditor={
 if(app.current()){$("fxieFilename").textContent=app.current().name}
 });
 })();
+
