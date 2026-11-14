@@ -428,3 +428,55 @@ body.fx-mode-editor .fx-assistant .chat-head b{font-size:25px!important}
  .fxie-move-done{min-height:44px!important;font-size:13px!important}
  .fxie-move-frame{min-height:34px!important;border-width:2px!important}
 }
+
+
+/* FXIE_RESIZABLE_INK_V15 — one-finger/mouse/Pencil drawing transform controls */
+.fxie-ink-selection{
+ position:absolute!important;z-index:36!important;box-sizing:border-box!important;
+ border:2px dashed #1879d8!important;border-radius:4px!important;
+ outline:2px solid #fefefe!important;outline-offset:1px!important;
+ background:#3288ec0b!important;box-shadow:0 0 0 1px #2264aa9c!important;
+ min-width:12px!important;min-height:12px!important;overflow:visible!important;
+ cursor:grab!important;touch-action:none!important;user-select:none!important;
+ -webkit-user-select:none!important;-webkit-touch-callout:none!important;
+}
+.fxie-ink-selection.fxie-ink-dragging{border-style:solid!important;background:#44a1f21e!important;cursor:grabbing!important}
+.fxie-ink-selection.fxie-ink-busy{pointer-events:none!important;opacity:.6!important}
+.fxie-ink-toolbar{
+ position:absolute!important;left:-2px!important;bottom:calc(100% + 5px)!important;
+ display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:2px!important;
+ max-width:95vw!important;min-height:35px!important;padding:2px!important;
+ border-radius:8px!important;background:#07569b!important;
+ box-shadow:0 5px 16px #071d447a!important;z-index:4!important
+}
+.fxie-ink-control{
+ display:inline-flex!important;justify-content:center!important;align-items:center!important;
+ min-height:31px!important;min-width:30px!important;padding:5px 7px!important;
+ border:0!important;border-radius:6px!important;background:#096bc1!important;
+ color:#fff!important;font:700 12px/1.1 system-ui,sans-serif!important;
+ white-space:nowrap!important;cursor:pointer!important;touch-action:manipulation!important;
+}
+.fxie-ink-control:hover{background:#0e8de6!important}
+.fxie-ink-control.fxie-ink-move{background:#09528c!important;cursor:grab!important;touch-action:none!important;min-width:70px!important}
+.fxie-ink-control.fxie-ink-delete{background:#933a4d!important}
+.fxie-ink-control.fxie-ink-done{background:#15815e!important}
+.fxie-ink-grip{
+ position:absolute!important;display:grid!important;place-items:center!important;
+ width:28px!important;height:28px!important;min-width:28px!important;min-height:28px!important;
+ padding:0!important;border:2px solid #fff!important;border-radius:7px!important;
+ color:#fff!important;background:#006dc7!important;box-shadow:0 2px 8px #0007!important;
+ font:bold 15px system-ui,sans-serif!important;touch-action:none!important;
+ user-select:none!important;cursor:nwse-resize!important;z-index:5!important;
+}
+.fxie-ink-width{right:-15px!important;top:calc(50% - 14px)!important;cursor:ew-resize!important}
+.fxie-ink-height{left:calc(50% - 14px)!important;bottom:-15px!important;cursor:ns-resize!important}
+.fxie-ink-corner{right:-15px!important;bottom:-15px!important;cursor:nwse-resize!important}
+@media(max-width:680px){
+ .fxie-ink-toolbar{max-width:min(94vw,420px)!important;overflow-x:auto!important}
+ .fxie-ink-control{min-height:42px!important;min-width:38px!important;font-size:13px!important}
+ .fxie-ink-control.fxie-ink-move{min-width:70px!important}
+ .fxie-ink-grip{width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important}
+ .fxie-ink-width{right:-20px!important;top:calc(50% - 19px)!important}
+ .fxie-ink-height{left:calc(50% - 19px)!important;bottom:-20px!important}
+ .fxie-ink-corner{right:-20px!important;bottom:-20px!important}
+}
