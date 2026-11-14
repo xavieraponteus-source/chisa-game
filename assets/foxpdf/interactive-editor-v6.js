@@ -98,8 +98,8 @@ try{
 /* Serialize all local edits across both panes so rapid pen strokes, text and images
    cannot overwrite one another's PDF bytes. Keep a bounded, unified undo history. */
 let fxieMutationChain=Promise.resolve(),fxieHistoryBytes=0;
-function fxieRememberUndo(bytes){
- const snap=bytes.slice();undo.push(snap);fxieHistoryBytes+=snap.byteLength;redo=[];
+function fxieRememberUndo(bytes,clearRedo=true){
+ const snap=bytes.slice();undo.push(snap);fxieHistoryBytes+=snap.byteLength;if(clearRedo)redo=[];
  while(undo.length>12||fxieHistoryBytes>48*1024*1024){
   const removed=undo.shift();if(removed)fxieHistoryBytes-=removed.byteLength;
  }
@@ -265,8 +265,8 @@ function fxiePrepareImage(asset){
   img.onerror=()=>reject(Error("Cannot preview this image"));img.src=url;
  });
 }
-function fxieImageBounds(box,w,h){
- const width=Math.max(24,Math.min(w,box.width)),height=Math.max(24,Math.min(h,box.height));
+function fxieImageBounds(box,w,h,minimum=24){
+ const width=Math.max(Math.min(minimum,w),Math.min(w,box.width)),height=Math.max(Math.min(minimum,h),Math.min(h,box.height));
  return {x:Math.max(0,Math.min(w-width,box.x)),y:Math.max(0,Math.min(h-height,box.y)),width,height};
 }
 function fxieImageSurface(){
@@ -305,9 +305,12 @@ async function fxieImageCommit(state){
   const img=type==="image/png"?await pdf.embedPng(bytes):await pdf.embedJpg(bytes);
   pg.drawImage(img,{x,y,width,height});
   const output=new Uint8Array(await pdf.save({useObjectStreams:true}));
+  const live=app.readCurrent();
+  if(!live||live.name!==current.name||!equalBytes(live.bytes,current.bytes))throw Error("The document changed during image processing. Your newer edits were kept.");
+  const previousLatest=state.latestBytes;
   state.latestBytes=output.slice();state.scale=scale;
   try{await app.replace(output);fxieRememberUndo(current.bytes)}
-  catch(err){state.latestBytes=null;throw err}
+  catch(err){state.latestBytes=previousLatest;throw err}
   state.busy=false;
   say("Image applied. Select it to move or resize again, then Apply.");
   fxieShowImageControls();
@@ -316,6 +319,12 @@ async function fxieImageCommit(state){
  const run=fxieMutationChain.then(job,job);
  fxieMutationChain=run.catch(()=>{});
  try{return await run}catch(err){state.busy=false;say("Image edit not applied: "+String(err?.message||err),true);return false}
+}
+function fxieImageRescale(state,scale){
+ if(!Number.isFinite(scale)||scale<=0)return;
+ const oldScale=state.scale||scale;
+ if(oldScale!==scale){const ratio=scale/oldScale;for(const key of ["x","y","width","height"])state.box[key]*=ratio}
+ state.scale=scale;
 }
 function fxieShowImageControls(){
  const state=fxieImageSession;
@@ -326,9 +335,9 @@ function fxieShowImageControls(){
  const surface=fxieImageSurface();
  if(!surface?.sheet)return;
  const sheet=surface.sheet,scale=surface.scale;
- state.scale=scale;
+ fxieImageRescale(state,scale);
  const frame=el("div","fxie-image-selection");
- const fit=()=>{const b=fxieImageBounds(state.box,sheet.clientWidth,sheet.clientHeight);Object.assign(state.box,b);Object.assign(frame.style,{left:b.x+"px",top:b.y+"px",width:b.width+"px",height:b.height+"px"})};
+ const fit=()=>{const b=fxieImageBounds(state.box,sheet.clientWidth,sheet.clientHeight,0);Object.assign(state.box,b);Object.assign(frame.style,{left:b.x+"px",top:b.y+"px",width:b.width+"px",height:b.height+"px"})};
  frame.setAttribute("role","group");frame.setAttribute("aria-label","Selected image. Drag to move or use resizing handles.");
  const preview=el("img","fxie-image-preview");preview.draggable=false;preview.alt="Inserted image, selectable and resizable";
  preview.src=state.asset.preview.url;frame.append(preview);
@@ -1197,20 +1206,21 @@ function chooseThumbnail(n,navigate=true){
  updateThumbSelection();
  if(navigate&&organizeState()?.page!==selectedThumb)app.setPage(selectedThumb);
 }
-function rememberPages(bytes){
- if(bytes.length<8*1024*1024){undo.push(bytes.slice());if(undo.length>9)undo.shift();redo=[]}
-}
 async function updatePageDocument(transform,success,newPage){
  if(organizerBusy)return false;
  const source=app.readCurrent();if(!source)return false;
  organizerBusy=true;
- try{
+ const job=async()=>{try{
+  const initial=app.readCurrent();
+  if(!initial||initial.name!==source.name||!equalBytes(initial.bytes,source.bytes))throw Error("The PDF changed before organizing. Select the page again.");
   const pdf=await PDFLib.PDFDocument.load(source.bytes.slice());
   const replacement=await transform(pdf);
   if(!replacement)return false;
   const bytes=new Uint8Array(await replacement.save({useObjectStreams:true}));
-  rememberPages(source.bytes);
+  const live=app.readCurrent();
+  if(!live||live.name!==source.name||!equalBytes(live.bytes,source.bytes))throw Error("The PDF changed during organizing. Your newer edits were kept.");
   await app.replace(bytes);
+  fxieRememberUndo(source.bytes);
   const desired=Math.max(1,Math.min(app.current().pages,Number(newPage)||selectedThumb));
   selectedThumb=desired;
   if(app.current().page!==desired)app.setPage(desired);
@@ -1222,7 +1232,8 @@ async function updatePageDocument(transform,success,newPage){
  }finally{
   organizerBusy=false;
   if(!mini.hidden)queueMicrotask(()=>renderThumbnails().catch(e=>say("Thumbnail error: "+e.message,true)));
- }
+ }};
+ const run=fxieMutationChain.then(job,job);fxieMutationChain=run.then(()=>{},()=>{});return run;
 }
 function retainMetadata(original,copy){
  try{const title=original.getTitle();if(title)copy.setTitle(title)}catch(_){}
@@ -1754,8 +1765,25 @@ $("fxieZoom").onchange=e=>{zoom=e.target.value;draw()};
 function currentZoom(){return zoom==="fit"?(rendered?.scale||1):Number(zoom)}
 function scaleBy(v){const factor=Math.max(.5,Math.min(2.5,currentZoom()*v));zoom=String(Math.round(factor*100)/100);const z=$("fxieZoom");if(![...z.options].some(o=>o.value===zoom))z.add(new Option(Math.round(factor*100)+"%",zoom));z.value=zoom;draw()}
 bind("fxieMinus",()=>scaleBy(.8));bind("fxiePlus",()=>scaleBy(1.25));
-bind("fxieUndo",async()=>{await fxieMutationChain;if(!undo.length)return say("Nothing to undo.");const d=app.readCurrent();redo.push(d.bytes.slice());const previous=undo.pop();fxieHistoryBytes-=previous.byteLength;await app.replace(previous);say("Last change undone.")});
-bind("fxieRedo",async()=>{await fxieMutationChain;if(!redo.length)return say("Nothing to redo.");const d=app.readCurrent();const next=redo.pop();fxieRememberUndo(d.bytes);await app.replace(next);say("Change restored.")});
+function fxieRestoreHistory(isRedo){
+ const job=async()=>{
+  const source=app.readCurrent(),stack=isRedo?redo:undo;
+  if(!source)return false;
+  if(!stack.length){say(isRedo?"Nothing to redo.":"Nothing to undo.");return false}
+  const target=stack[stack.length-1];
+  try{
+   await app.replace(target.slice());
+   // A rejected write must leave both history stacks untouched.
+   stack.pop();
+   if(isRedo)fxieRememberUndo(source.bytes,false);
+   else{fxieHistoryBytes-=target.byteLength;redo.push(source.bytes.slice())}
+   say(isRedo?"Change restored.":"Last change undone.");return true;
+  }catch(err){say("History could not be restored: "+String(err?.message||err),true);return false}
+ };
+ const run=fxieMutationChain.then(job,job);fxieMutationChain=run.then(()=>{},()=>{});return run;
+}
+bind("fxieUndo",()=>fxieRestoreHistory(false));
+bind("fxieRedo",()=>fxieRestoreHistory(true));
 bind("fxieInfo",()=>alert("The FoxPDF editor renders pages and selectable text blocks. Original paragraph editing uses guarded server processing and may reject font-complex layouts. Permanent redaction is a separate, secure operation."));
 window.addEventListener("foxpdf:change",()=>{const d=app.current();if(d){$("fxieFilename").textContent=d.name;$("fxieCount").textContent=d.page+" / "+d.pages;if(historyName!==d.name){undo=[];redo=[];fxieHistoryBytes=0;historyName=d.name}}if(!mini.hidden&&d){
  if(d.bytes!==thumbRenderedSource){
