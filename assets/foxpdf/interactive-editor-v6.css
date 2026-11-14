@@ -480,3 +480,32 @@ body.fx-mode-editor .fx-assistant .chat-head b{font-size:25px!important}
  .fxie-ink-height{left:calc(50% - 19px)!important;bottom:-20px!important}
  .fxie-ink-corner{right:-20px!important;bottom:-20px!important}
 }
+
+
+/* FOXPDF_SPLIT_INTERACTION_POLISH_2026: both document columns remain stable on touch */
+.fxie-scroll.fxie-split-active .fxie-split-head{
+ height:auto!important;min-height:86px!important;flex:0 0 auto!important;
+ display:flex!important;flex-wrap:wrap!important;gap:6px!important;align-content:center!important;
+}
+.fxie-scroll.fxie-split-active .fxie-left-spread-head{min-height:86px!important;height:86px!important;flex:0 0 86px!important}
+.fxie-scroll.fxie-split-active .fxie-sheetwrap,
+.fxie-scroll.fxie-split-active .fxie-split-pane{min-height:calc(var(--fxie-spread-frame-height,480px) + 86px)!important}
+.fxie-split-edit-actions{display:flex!important;flex-wrap:wrap!important;justify-content:flex-start!important;gap:5px!important;order:3;width:100%}
+.fxie-split-edit-action{min-height:34px!important;min-width:44px!important;border:1px solid #bd974c!important;border-radius:7px!important;background:#29242c!important;color:#f1dca6!important;font:600 12px system-ui!important;touch-action:manipulation!important}
+.fxie-split-edit-action.selected,.fxie-split-edit-action[aria-pressed="true"]{background:#806222!important;color:#fff!important;border-color:#eed08b!important}
+.fxie-right-edit-sheet{position:relative;isolation:isolate;user-select:none;-webkit-user-select:none}
+.fxie-right-edit-sheet .fxie-right-text-hits{z-index:2}
+.fxie-right-edit-sheet .fxie-right-ink{z-index:3}
+.fxie-right-edit-sheet .fxie-right-session-actions{z-index:8}
+.fxie-right-edit-sheet .fxie-right-inline-editor{z-index:15!important;user-select:text;-webkit-user-select:text}
+.fxie-right-edit-sheet .fxie-right-inline-editor textarea{touch-action:auto;user-select:text;-webkit-user-select:text}
+.fxie-right-edit-sheet .fxie-right-session-actions button{min-height:44px!important;touch-action:manipulation}
+.fxie-right-text-hits .fxie-textregion{cursor:text;touch-action:manipulation}
+.fxie-scroll.fxie-split-active .fxie-split-content{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+@media(max-width:650px){
+ .fxie-scroll.fxie-split-active .fxie-split-head{min-height:104px!important}
+ .fxie-scroll.fxie-split-active .fxie-left-spread-head{height:104px!important;min-height:104px!important;flex-basis:104px!important}
+ .fxie-scroll.fxie-split-active .fxie-sheetwrap,.fxie-scroll.fxie-split-active .fxie-split-pane{min-height:calc(var(--fxie-spread-frame-height,480px) + 104px)!important}
+ .fxie-split-edit-action{min-height:44px!important}
+ .fxie-right-inline-editor{max-width:calc(100% - 12px)}
+}
