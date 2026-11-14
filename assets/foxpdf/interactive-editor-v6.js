@@ -863,7 +863,7 @@ async function inspectRemote(source){
 }
 function reflowParagraph(paragraphs,text){
  const ranked=paragraphs.map(item=>({item,match:score(text,item.text||item.preview)})).sort((a,b)=>b.match-a.match);
- if(!ranked.length||ranked[0].match<85)throw Error("The original paragraph could not be matched safely. Select a complete text region.");
+ if(!ranked.length||ranked[0].match!==100)throw Error("The original paragraph could not be matched safely. Select a complete paragraph; partial lines cannot safely replace a full paragraph.");
  if(ranked.length>1&&ranked[0].match===ranked[1].match)throw Error("Several paragraphs match this text. Advanced reflow cannot safely choose one.");
  const chosen=ranked[0].item;
  if(chosen.mixed_styles)throw Error("Mixed-font paragraph cannot safely reflow");
@@ -937,6 +937,16 @@ function findOccurrences(value,query,whole,caseSensitive){
  }
  return found;
 }
+function findTextMetrics(item,style,font){
+ const context=document.createElement("canvas").getContext("2d");
+ const family=font?.loadedName||style?.fontFamily||"sans-serif";
+ const cssFamily=/^(serif|sans-serif|monospace|cursive|fantasy)$/.test(family)?family:'"'+family.replace(/["\\]/g,"")+'"';
+ context.font='100px '+cssFamily+', '+(font?.fallbackName||style?.fontFamily||"sans-serif");
+ context.fontKerning="none";
+ const total=context.measureText(item.str).width;
+ if(!Number.isFinite(total)||total<=0)throw Error("Text metrics unavailable for this font");
+ return index=>context.measureText(item.str.slice(0,index)).width/total;
+}
 function findMarkPage(sheet,page,scale){
  if(!sheet)return;
  sheet.querySelectorAll(".fxie-find-highlight").forEach(x=>x.remove());
@@ -989,16 +999,21 @@ async function findScan(){
   for(let page=1;page<=reader.numPages;page++){
    if(seq!==fxieFind.serial){reader.destroy();return}
    const pg=await reader.getPage(page),viewport=pg.getViewport({scale:1}),content=await pg.getTextContent();
+   // Resolve the PDF's actual browser fonts before measuring proportional glyph advances.
+   await pg.getOperatorList();
    for(const item of content.items){
     if(!item.str||!item.str.trim())continue;
     const transform=lib.Util.transform(viewport.transform,item.transform);
     const fontHeight=Math.max(5,Math.hypot(transform[2],transform[3]));
     const itemWidth=Math.max(1,Math.abs(item.width)||1);
     const matches=findOccurrences(item.str,query,whole,caseSensitive);
+    if(!matches.length)continue;
+    let font;try{font=pg.commonObjs.get(item.fontName)}catch{}
+    const offset=findTextMetrics(item,content.styles?.[item.fontName],font);
     for(const [start,end] of matches){
-     const portionStart=start/item.str.length,portionLength=(end-start)/item.str.length;
+     const portionStart=offset(start),portionLength=offset(end)-portionStart;
      hits.push({page,start,end,str:item.str,x:transform[4]+itemWidth*portionStart,top:transform[5]-fontHeight,width:itemWidth*portionLength,height:fontHeight,
-      baseline:transform[5],itemX:transform[4],itemWidth,fontHeight,pageWidth:viewport.width,pageHeight:viewport.height});
+      baseline:transform[5],itemX:transform[4],itemWidth,fontHeight,pageWidth:viewport.width,pageHeight:viewport.height,rotated:Math.abs(transform[1])>.01||Math.abs(transform[2])>.01});
     }
    }
   }
@@ -1011,6 +1026,13 @@ async function findScan(){
   fxieFind.hits=hits;fxieFind.documentBytes=sourceBytes;
   findCount();
  }catch(err){findEl("fxFindCount").textContent="Search unavailable: "+String(err?.message||err);say("Search failed.",true)}
+}
+function findReplacementSize(font,text,size,width){
+ const measured=font.widthOfTextAtSize(text,size);
+ if(!Number.isFinite(measured)||!Number.isFinite(width)||width<=0)throw Error("Replacement text cannot be measured safely");
+ const fitSize=measured>width?size*width/measured:size;
+ if(fitSize<5)throw Error("Replacement is too long to fit safely. Use Advanced reflow for a longer paragraph.");
+ return fitSize;
 }
 async function findReplace(onlyCurrent){
  const replacement=findEl("fxFindWith").value;
@@ -1032,12 +1054,16 @@ async function findReplace(onlyCurrent){
   const font=await fxieEmbedSelectedFont(pdf,replacementFont);
   for(const hit of targets){
    const page=pdf.getPage(hit.page-1);
-   if(page.getRotation().angle%360!==0)throw Error("Rotated pages require advanced text editing");
+   if(page.getRotation().angle%360!==0||hit.rotated)throw Error("Rotated text or pages require advanced text editing");
    const x=Math.max(0,hit.x),baseline=page.getHeight()-hit.baseline;
    const size=Math.max(5,Math.min(65,hit.fontHeight));
    const coverWidth=Math.max(hit.width,3);
    page.drawRectangle({x,y:Math.max(0,baseline-2),width:Math.min(coverWidth+2,page.getWidth()-x),height:Math.min(size+5,page.getHeight()-Math.max(0,baseline-2)),color:PDFLib.rgb(1,1,1)});
-   if(replacement)page.drawText(replacement,{x,y:Math.max(0,baseline),size,font,color:color(),maxWidth:Math.max(4,page.getWidth()-x-2)});
+   // Keep replacement text inside the original word's width so it cannot overwrite its neighbours.
+   if(replacement){
+    const fitSize=findReplacementSize(font,replacement,size,hit.width);
+    page.drawText(replacement,{x,y:Math.max(0,baseline),size:fitSize,font,color:color()});
+   }
   }
  },"Replaced "+targets.length+" visible occurrence(s). Review the result and save.");
  if(ok){await findScan();say("Replacements applied. Original text may still be searchable; not secure redaction.")}
