@@ -364,3 +364,67 @@ body.fx-mode-editor .fx-assistant .chat-head b{font-size:25px!important}
  .fxie-root[data-mode=draw] .fxie-paneldone{display:inline-block!important;min-height:40px!important}
  .fxie-root[data-mode=draw] .fxie-ink-options{display:flex!important}
 }
+
+
+/* FXIE_MOVABLE_TEXT_V14 — drag edited/inserted text directly on the PDF.
+   44px touch affordances for iPhone/iPad, mouse and stylus. */
+.fxie-inline-grip{
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ width:100%!important;min-height:38px!important;padding:7px 9px!important;
+ font:700 12px/1.2 system-ui,sans-serif!important;
+ color:#0e4580!important;background:#dceeff!important;
+ border:1px solid #83b6e5!important;border-radius:6px!important;
+ cursor:grab!important;touch-action:none!important;user-select:none!important;
+ -webkit-user-select:none!important;-webkit-touch-callout:none!important
+}
+.fxie-inline-dragging{box-shadow:0 7px 25px #123d7f85!important;border-color:#086ee3!important}
+.fxie-inline-dragging .fxie-inline-grip{cursor:grabbing!important;background:#a8d9ff!important}
+.fxie-move-frame{
+ position:absolute!important;z-index:33!important;
+ border:2px dashed #147de4!important;
+ outline:2px solid #ffffffdd!important;outline-offset:0;
+ background:transparent!important;
+ min-width:55px!important;min-height:27px!important;
+ cursor:grab!important;touch-action:none!important;
+ user-select:none!important;-webkit-user-select:none!important;
+ -webkit-touch-callout:none!important;
+ box-shadow:0 0 0 1px #084e9677!important;
+ border-radius:3px!important;box-sizing:border-box!important
+}
+.fxie-move-frame:hover{border-color:#0073e6!important;box-shadow:0 0 0 2px #2a98ff99!important}
+.fxie-move-label{
+ position:absolute!important;left:-2px!important;bottom:calc(100% + 2px)!important;
+ height:32px!important;min-width:115px!important;max-width:140px!important;
+ border:1px solid #0874d8!important;border-radius:7px 7px 0 0!important;
+ background:#0876d8!important;color:#fff!important;
+ font:700 12px/1.2 system-ui,sans-serif!important;
+ cursor:grab!important;touch-action:none!important;
+ white-space:nowrap!important;padding:6px 9px!important;
+ box-shadow:0 1px 7px #092f587d!important
+}
+.fxie-move-done{
+ position:absolute!important;left:120px!important;bottom:calc(100% + 2px)!important;
+ min-height:32px!important;padding:5px 9px!important;
+ border:1px solid #136b50!important;border-radius:5px!important;
+ background:#116d53!important;color:#fff!important;
+ font:700 12px/1.1 system-ui,sans-serif!important;
+ cursor:pointer!important;white-space:nowrap!important;touch-action:manipulation!important
+}
+.fxie-move-preview{
+ display:none!important;position:absolute!important;inset:0!important;
+ max-width:100%!important;max-height:100%!important;
+ overflow:hidden!important;white-space:pre-wrap!important;
+ line-height:1.16!important;font-weight:400!important;
+ background:#fffc!important;pointer-events:none!important;
+ text-align:left!important
+}
+.fxie-move-frame.fxie-moving{cursor:grabbing!important;border-style:solid!important;box-shadow:0 5px 15px #114fbd77!important}
+.fxie-move-frame.fxie-moving .fxie-move-label{cursor:grabbing!important}
+.fxie-move-frame.fxie-moving .fxie-move-preview{display:block!important;opacity:.92!important}
+.fxie-move-frame.fxie-move-busy{opacity:.55!important;pointer-events:none!important}
+@media(max-width:700px){
+ .fxie-inline-grip{min-height:44px!important;font-size:13px!important}
+ .fxie-move-label{min-height:44px!important;font-size:13px!important}
+ .fxie-move-done{min-height:44px!important;font-size:13px!important}
+ .fxie-move-frame{min-height:34px!important;border-width:2px!important}
+}
