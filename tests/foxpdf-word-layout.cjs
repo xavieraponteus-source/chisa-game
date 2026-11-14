@@ -1,0 +1,10 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const source=fs.readFileSync(path.join(__dirname,'../assets/foxpdf/interactive-editor-v6.js'),'utf8');
+const ctx={document:{createElement:()=>({getContext:()=>({measureText:text=>({width:[...text].reduce((n,c)=>n+(c==='W'?100:c==='i'?10:20),0)})})})}};
+vm.createContext(ctx);
+vm.runInContext(source.slice(source.indexOf('function findTextMetrics('),source.indexOf('function findMarkPage(')),ctx);
+vm.runInContext(source.slice(source.indexOf('function findReplacementSize('),source.indexOf('async function findReplace(')),ctx);
+test('proportional font positions use glyph advances rather than character counts',()=>{const offset=ctx.findTextMetrics({str:'WWii'},{fontFamily:'serif'});assert.equal(offset(2),200/220);assert.equal(offset(4),1);});
+test('longer replacement fits in the original width without touching adjacent text',()=>{const font={widthOfTextAtSize:(text,size)=>text.length*size};const size=ctx.findReplacementSize(font,'long',12,36);assert.equal(size,9);assert.equal(font.widthOfTextAtSize('long',size),36);});
+test('short replacements keep the original font size',()=>{assert.equal(ctx.findReplacementSize({widthOfTextAtSize:()=>10},'a',12,36),12);});
+test('unreadably small and unmeasurable replacements are rejected',()=>{assert.throws(()=>ctx.findReplacementSize({widthOfTextAtSize:()=>1000},'long',12,20),/too long/);assert.throws(()=>ctx.findReplacementSize({widthOfTextAtSize:()=>NaN},'x',12,20),/measured safely/);});
