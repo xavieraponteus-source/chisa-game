@@ -1759,7 +1759,10 @@ window.addEventListener("keydown",event=>{
 });
 window.addEventListener("blur",clearTouchDrag);
 
-bind("fxiePanelDone",()=>view.classList.add("fxie-drawer-closed"));bind("fxieRotate",()=>app.click("rotate"));bind("fxieAddPage",()=>app.click("blankPage"));bind("fxieDelete",()=>app.click("delete"));
+bind("fxiePanelDone",()=>view.classList.add("fxie-drawer-closed"));
+bind("fxieRotate",()=>{selectedThumb=app.current()?.page||1;return rotateSelected()});
+bind("fxieAddPage",()=>addBlank(app.current()?.page||1));
+bind("fxieDelete",async()=>{const page=app.current()?.page;if(!page)return;toggleOrganizer(true);await renderThumbnails();askDeletePage(page)});
 bind("fxiePrev",()=>{const d=app.current();if(d)app.setPage(Math.max(1,d.page-1))});bind("fxieNext",()=>{const d=app.current();if(d)app.setPage(Math.min(d.pages,d.page+1))});
 $("fxieZoom").onchange=e=>{zoom=e.target.value;draw()};
 function currentZoom(){return zoom==="fit"?(rendered?.scale||1):Number(zoom)}
