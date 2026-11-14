@@ -1110,6 +1110,7 @@ async function setSplitView(pageNumber,refresh=false){
   button.classList.toggle("selected",splitEditMode===tool);
   button.addEventListener("click",()=>{
    splitEditMode=tool;
+   const ink=splitPane?.querySelector(".fxie-right-ink");if(ink)ink.style.pointerEvents=tool==="edit"?"none":"auto";
    rightTools.querySelectorAll("[data-right-tool]").forEach(b=>{const active=b.dataset.rightTool===tool;b.classList.toggle("selected",active);b.setAttribute("aria-pressed",String(active))});
    say("Right page "+n+": "+tool+" is ready. Tap or drag directly on that page.");
   });
@@ -1157,6 +1158,7 @@ async function setSplitView(pageNumber,refresh=false){
   rightSheet.append(hitLayer);
   const inkLayer=el("div","fxie-right-ink");
   Object.assign(inkLayer.style,{position:"absolute",inset:"0",touchAction:"none",pointerEvents:"auto"});
+  inkLayer.style.pointerEvents=splitEditMode==="edit"?"none":"auto";
   rightSheet.append(inkLayer);
   canvasWrap.replaceChildren(rightSheet);
   const scale=metrics.scale;
