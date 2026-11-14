@@ -326,6 +326,17 @@ function fxieImageRescale(state,scale){
  if(oldScale!==scale){const ratio=scale/oldScale;for(const key of ["x","y","width","height"])state.box[key]*=ratio}
  state.scale=scale;
 }
+function fxiePositionImageToolbar(frame,toolbar,sheet){
+ const area=sheet.closest(".fxie-split-content")||sheet.closest(".fxie-scroll")||sheet;
+ const viewport=area.getBoundingClientRect(),box=frame.getBoundingClientRect();
+ const width=Math.max(100,Math.min(360,viewport.width-20));
+ toolbar.style.width=width+"px";toolbar.style.maxWidth=width+"px";
+ const bounds=toolbar.getBoundingClientRect();
+ toolbar.style.left=(Math.max(viewport.left+6,Math.min(box.left,viewport.right-bounds.width-6))-box.left)+"px";
+ const below=box.top-viewport.top<bounds.height+12;
+ toolbar.style.top=below?"calc(100% + 8px)":"auto";
+ toolbar.style.bottom=below?"auto":"calc(100% + 8px)";
+}
 function fxieShowImageControls(){
  const state=fxieImageSession;
  document.querySelectorAll(".fxie-image-selection").forEach(x=>x.remove());
@@ -339,7 +350,7 @@ function fxieShowImageControls(){
  const frame=el("div","fxie-image-selection");
  // A click synthesized after drag/resize belongs to this selection, not the page-placement tool.
  frame.addEventListener("click",event=>event.stopPropagation());
- const fit=()=>{const b=fxieImageBounds(state.box,sheet.clientWidth,sheet.clientHeight,0);Object.assign(state.box,b);Object.assign(frame.style,{left:b.x+"px",top:b.y+"px",width:b.width+"px",height:b.height+"px"})};
+ const fit=()=>{const b=fxieImageBounds(state.box,sheet.clientWidth,sheet.clientHeight,0);Object.assign(state.box,b);Object.assign(frame.style,{left:b.x+"px",top:b.y+"px",width:b.width+"px",height:b.height+"px"});fxiePositionImageToolbar(frame,toolbar,sheet)};
  frame.setAttribute("role","group");frame.setAttribute("aria-label","Selected image. Drag to move or use resizing handles.");
  const preview=el("img","fxie-image-preview");preview.draggable=false;preview.alt="Inserted image, selectable and resizable";
  preview.src=state.asset.preview.url;frame.append(preview);
@@ -402,7 +413,7 @@ function fxieShowImageControls(){
   say("Image adjusted. Tap Apply to save its position.");
  });
  frame.addEventListener("pointercancel",()=>{pointer=null});
- fit();sheet.append(frame);
+ sheet.append(frame);fit();
 }
 $("fxieImageFile").onchange=async e=>{
  const f=e.target.files?.[0];e.target.value="";if(!f)return;
