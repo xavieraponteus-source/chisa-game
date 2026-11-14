@@ -91,7 +91,7 @@ try{
  }else pageFrame.replaceChildren(sheet);
  if(lastPdf&&lastPdf!==reader)lastPdf.destroy?.();lastPdf=reader;
  rendered={scale,canvas,overlay,w:vp.width,h:vp.height,page:page,originalWidth:base.width,originalHeight:base.height};
- showMovableText(sheet);showMovableInk(sheet);fxieShowImageControls();
+ showMovableText(sheet);showMovableInk(sheet);fxieShowImageControls();findRefreshVisible();
  say("Page "+d.page+" · "+count+" selectable text regions");
 }catch(e){$("fxieSheetWrap").replaceChildren(el("p","fxie-error","Unable to show page: "+e.message));say("PDF rendering failed: "+e.message,true)}
 }
@@ -817,7 +817,127 @@ bind("fxieDigitalSign",()=>window.FoxPDFTaskPicker?.launch("certificate"));
 bind("fxieDrawSignature",()=>window.FoxPDFTaskPicker?.launch("sign"));
 bind("fxieSave",()=>app.save());bind("fxieShare",()=>app.share());bind("fxiePrint",()=>window.FoxPDFPro?.open("print"));
 bind("fxieAdvanced",()=>window.FoxPDFPro?window.FoxPDFPro.open("tools"):say("Advanced tools are loading. Please try again.",true));bind("fxieChisa",()=>window.FoxPDFChisaToggle?window.FoxPDFChisaToggle(true,true):$("chat").hidden=false);bind("fxieComments",()=>window.FoxPDFPro?.open("annotate"));
-bind("fxieSearch",()=>window.FoxPDFPro?.open("search"));bind("fxieProperties",()=>window.FoxPDFPro?.open("metadata"));bind("fxieMarkup",()=>window.FoxPDFPro?.open("annotate"));
+
+/* FIND ALL / REPLACE ONE / REPLACE ALL — local visual edits, never secure redaction. */
+const fxieFind={query:"",hits:[],index:0,serial:0,documentName:""};
+const findBox=el("aside","fxie-search-panel");
+findBox.hidden=true;
+findBox.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between"><strong>Find & Replace</strong><button type="button" id="fxFindClose">✕</button></div><label>Search word or phrase<input id="fxFindWord" type="text" autocomplete="off" placeholder="Enter any word"></label><label>Replace with<input id="fxFindWith" type="text" placeholder="Replacement text"></label><label><input id="fxFindWhole" type="checkbox" checked> Whole word only</label><label><input id="fxFindCase" type="checkbox"> Match case</label><div class="fxie-search-actions"><button id="fxFindRun">Find all</button><button id="fxFindPrevious">‹ Previous</button><button id="fxFindNext">Next ›</button></div><div id="fxFindCount" role="status" aria-live="polite">Enter a word to search.</div><div class="fxie-search-actions"><button id="fxFindOne">Replace this</button><button id="fxFindAll">Replace all</button></div><div id="fxFindList" class="fxie-search-pages"></div><p class="fxie-search-note">Search works on selectable text in your PDF. Image-only pages require OCR first. This local replacement visually covers matched text and adds new text; original content may still exist in the PDF. It is not redaction. Formatting may change.</p>';
+view.querySelector(".fxie-stage").append(findBox);
+const findEl=id=>document.getElementById(id);
+const wordCharacter=c=>!!c&&/[\p{L}\p{N}_]/u.test(c);
+function findOccurrences(value,query,whole,caseSensitive){
+ const original=String(value||""),a=caseSensitive?original:original.toLocaleLowerCase(),b=caseSensitive?query:query.toLocaleLowerCase();
+ if(!b)return [];
+ const found=[];let pos=0;
+ while(pos<a.length){
+  const at=a.indexOf(b,pos);if(at<0)break;
+  if(!whole||(!wordCharacter(original[at-1])&&!wordCharacter(original[at+b.length])))found.push([at,at+b.length]);
+  pos=at+Math.max(1,b.length);
+ }
+ return found;
+}
+function findMarkPage(sheet,page,scale){
+ if(!sheet)return;
+ sheet.querySelectorAll(".fxie-find-highlight").forEach(x=>x.remove());
+ const selection=fxieFind.hits[fxieFind.index];
+ for(let i=0;i<fxieFind.hits.length;i++){
+  const m=fxieFind.hits[i];if(m.page!==page)continue;
+  const hit=el("span","fxie-find-highlight");
+  const x=m.x*scale,y=m.top*scale,width=m.width*scale,height=m.height*scale;
+  Object.assign(hit.style,{left:x+"px",top:y+"px",width:Math.max(5,width)+"px",height:Math.max(7,height)+"px",background:i===fxieFind.index?"#ff9825a6":"#fce85677",borderColor:i===fxieFind.index?"#fb6815":"#d69e2d"});
+  sheet.append(hit);
+ }
+}
+function findRefreshVisible(){
+ const current=app.current();
+ if(!current)return;
+ findMarkPage($("fxieSheetWrap").querySelector(".fxie-sheet"),current.page,rendered?.scale||1);
+ if(splitPage){const right=splitPane?.querySelector(".fxie-right-edit-sheet");if(right)findMarkPage(right,splitPage,Number(right.dataset.imageScale)||1)}
+}
+function findCount(){
+ const count=fxieFind.hits.length,i=fxieFind.index;
+ findEl("fxFindCount").textContent=count?(count+" match"+(count===1?"":"es")+" · Selected "+(i+1)+" of "+count):"No selectable text matches found.";
+ for(const id of ["fxFindOne","fxFindAll","fxFindPrevious","fxFindNext"])findEl(id).disabled=!count;
+ const list=findEl("fxFindList");list.replaceChildren();
+ const byPage=new Map();for(const hit of fxieFind.hits)byPage.set(hit.page,(byPage.get(hit.page)||0)+1);
+ for(const [page,total] of byPage){const b=el("button","", "Page "+page+" ("+total+")");b.type="button";b.onclick=()=>{const at=fxieFind.hits.findIndex(h=>h.page===page);if(at>=0)findSelect(at)};list.append(b)}
+ findRefreshVisible();
+}
+function findSelect(i){
+ if(!fxieFind.hits.length)return;
+ fxieFind.index=(i+fxieFind.hits.length)%fxieFind.hits.length;
+ const hit=fxieFind.hits[fxieFind.index],current=app.current();
+ if(current?.page!==hit.page&&splitPage!==hit.page)app.setPage(hit.page);
+ findCount();
+}
+async function findScan(){
+ const query=findEl("fxFindWord").value.trim();
+ fxieFind.query=query;fxieFind.hits=[];fxieFind.index=0;
+ const seq=++fxieFind.serial;
+ if(!query){findEl("fxFindCount").textContent="Enter a word to search.";findRefreshVisible();return}
+ const file=app.readCurrent();if(!file)return say("Open a PDF first.",true);
+ fxieFind.documentName=file.name;
+ findEl("fxFindCount").textContent="Searching every page…";
+ try{
+  const lib=await getJs(),reader=await lib.getDocument({data:file.bytes.slice()}).promise;
+  const whole=findEl("fxFindWhole").checked,caseSensitive=findEl("fxFindCase").checked;
+  for(let page=1;page<=reader.numPages;page++){
+   if(seq!==fxieFind.serial){reader.destroy();return}
+   const pg=await reader.getPage(page),viewport=pg.getViewport({scale:1}),content=await pg.getTextContent();
+   for(const item of content.items){
+    if(!item.str||!item.str.trim())continue;
+    const transform=lib.Util.transform(viewport.transform,item.transform);
+    const fontHeight=Math.max(5,Math.hypot(transform[2],transform[3]));
+    const itemWidth=Math.max(1,Math.abs(item.width)||1);
+    const matches=findOccurrences(item.str,query,whole,caseSensitive);
+    for(const [start,end] of matches){
+     const portionStart=start/item.str.length,portionLength=(end-start)/item.str.length;
+     fxieFind.hits.push({page,start,end,str:item.str,x:transform[4]+itemWidth*portionStart,top:transform[5]-fontHeight,width:itemWidth*portionLength,height:fontHeight,
+      baseline:transform[5],itemX:transform[4],itemWidth,fontHeight,pageWidth:viewport.width,pageHeight:viewport.height});
+    }
+   }
+  }
+  reader.destroy();
+  if(seq!==fxieFind.serial)return;
+  findCount();
+ }catch(err){findEl("fxFindCount").textContent="Search unavailable: "+String(err?.message||err);say("Search failed.",true)}
+}
+async function findReplace(onlyCurrent){
+ const replacement=findEl("fxFindWith").value;
+ const targets=onlyCurrent?[fxieFind.hits[fxieFind.index]]:fxieFind.hits.slice();
+ if(!targets.length)return;
+ if(!onlyCurrent&&!confirm("Replace all "+targets.length+" visible text match(es) in this PDF? Complex formatting may change, and this does not securely erase original text."))return;
+ const before=app.readCurrent();if(!before||before.name!==fxieFind.documentName)return;
+ const replacementFont=String(findEl("fxieFont")?.value||"Helvetica");
+ const expected=before.bytes.slice();
+ const ok=await mutate(async pdf=>{
+  if(pdf.getPageCount()<Math.max(...targets.map(t=>t.page)))throw Error("Pages changed");
+  // Batch all matches into one PDF write and one undo step. These edits are visual,
+  // not true content-stream replacement or secure removal.
+  const font=await fxieEmbedSelectedFont(pdf,replacementFont);
+  for(const hit of targets){
+   const page=pdf.getPage(hit.page-1);
+   if(page.getRotation().angle%360!==0)throw Error("Rotated pages require advanced text editing");
+   const x=Math.max(0,hit.x),baseline=page.getHeight()-hit.baseline;
+   const size=Math.max(5,Math.min(65,hit.fontHeight));
+   const coverWidth=Math.max(hit.width,3);
+   page.drawRectangle({x,y:Math.max(0,baseline-2),width:Math.min(coverWidth+2,page.getWidth()-x),height:Math.min(size+5,page.getHeight()-Math.max(0,baseline-2)),color:PDFLib.rgb(1,1,1)});
+   if(replacement)page.drawText(replacement,{x,y:Math.max(0,baseline),size,font,color:color(),maxWidth:Math.max(4,page.getWidth()-x-2)});
+  }
+ },"Replaced "+targets.length+" visible occurrence(s). Review the result and save.");
+ if(ok){await findScan();say("Replacements applied. Original text may still be searchable; not secure redaction.")}
+}
+bind("fxieSearch",()=>{findBox.hidden=!findBox.hidden;if(!findBox.hidden){findEl("fxFindWord").focus();if(fxieFind.query)findScan()}});
+findEl("fxFindClose").onclick=()=>{findBox.hidden=true};
+findEl("fxFindRun").onclick=findScan;
+findEl("fxFindPrevious").onclick=()=>findSelect(fxieFind.index-1);
+findEl("fxFindNext").onclick=()=>findSelect(fxieFind.index+1);
+findEl("fxFindOne").onclick=()=>findReplace(true);
+findEl("fxFindAll").onclick=()=>findReplace(false);
+findEl("fxFindWord").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();findScan()}};
+for(const id of ["fxFindWhole","fxFindCase"])findEl(id).onchange=()=>{if(fxieFind.query)findScan()};
+bind("fxieProperties",()=>window.FoxPDFPro?.open("metadata"));bind("fxieMarkup",()=>window.FoxPDFPro?.open("annotate"));
 const mini=el("aside","fxie-mini-pages");mini.id="fxieThumbnails";mini.hidden=true;mini.setAttribute("aria-label","PDF page organizer");
 const pageStage=view.querySelector(".fxie-stage");
 const pageDimmer=el("button","fxie-organizer-dimmer");pageDimmer.type="button";pageDimmer.hidden=true;
@@ -1317,7 +1437,7 @@ async function setSplitView(pageNumber,refresh=false){
   rightSheet.dataset.imageScale=String(metrics.scale);
   rightSheet.append(inkLayer);
   canvasWrap.replaceChildren(rightSheet);
-  requestAnimationFrame(fxieShowImageControls);
+  requestAnimationFrame(()=>{fxieShowImageControls();findRefreshVisible()});
   const scale=metrics.scale;
   const rightPoint=e=>{
    const rect=rightSheet.getBoundingClientRect();
