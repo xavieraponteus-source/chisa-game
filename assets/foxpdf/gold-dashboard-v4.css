@@ -1,3 +1,9 @@
+/* Prevent the original PDF landing layout from flashing before the modern dashboard is mounted. A delayed CSS fallback keeps the page usable if scripts fail. */
+@keyframes fxLegacyFallback{to{opacity:1;visibility:visible}}
+html:not(.fx-ui-ready) body>header.site-nav,html:not(.fx-ui-ready) body>main.shell{opacity:0;visibility:hidden;animation:fxLegacyFallback .01s 6.5s forwards}
+html:not(.fx-ui-ready) body::before{content:"FoxPDF Studio";position:fixed;inset:0;z-index:2147483645;display:grid;place-items:center;color:#f0c26e;background:#090909;font:600 24px system-ui,sans-serif;pointer-events:none;animation:fxBootExit .01s 6.5s forwards}
+@keyframes fxBootExit{to{opacity:0;visibility:hidden}}
+html.fx-ui-ready body::before{content:none!important}
 
 /* FoxPDF Studio — Black & Gold Dashboard v4
  * True HTML controls; reference-matched layout; previous PDF runtime untouched.
