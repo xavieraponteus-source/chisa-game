@@ -452,7 +452,7 @@ async function finishInk(e){
  const coords=state.points.map(p=>({x:Math.max(0,Math.min(w,p.x/state.scale)),y:Math.max(0,Math.min(h,h-p.y/state.scale))}));
  const original=inkRect(coords,state.thickness,w,h);
  const session={name:previous.name,page:state.page,baseBytes:previous.bytes.slice(),
-  latestBytes:null,original,box:{...original},points:coords,thickness:state.thickness,hex:state.color,busy:false};
+  latestBytes:null,original,box:{...original},points:coords,thickness:state.thickness,hex:state.color,busy:false,pageWidth:w,pageHeight:h};
  const ok=await mutate(async pdf=>paintInkSession(pdf,session),
    "Drawing added. Drag the blue selection to move it or resize using its handles.");
  if(!ok)return;
@@ -669,13 +669,13 @@ function showMovableText(sheet){
 }
 
 
-function showMovableInk(sheet){
+function showMovableInk(sheet,pageOverride,scaleOverride,dimensions){
  sheet.querySelector(".fxie-ink-selection")?.remove();
- const state=inkSession,d=app.current();
- if(!state||!d||!rendered||!state.latestBytes||state.name!==d.name||state.page!==d.page)return;
- if(["draw","highlight","image","text"].includes(mode))return;
+ const state=inkSession,d=app.current(),pageNumber=pageOverride||d?.page;
+ if(!state||!d||!rendered||!state.latestBytes||state.name!==d.name||state.page!==pageNumber)return;
+ if((!pageOverride&&["draw","highlight","image","text"].includes(mode))||(pageOverride&&["draw","highlight","image","text"].includes(splitEditMode)))return;
  if(!equalBytes(currentBytes(),state.latestBytes)){inkSession=null;return}
- const sc=rendered.scale,h=rendered.originalHeight,b=state.box;
+ const sc=scaleOverride||rendered.scale,h=dimensions?.height||state.pageHeight||rendered.originalHeight,w=dimensions?.width||state.pageWidth||rendered.originalWidth,b=state.box;
  const frame=el("div","fxie-ink-selection");
  frame.setAttribute("role","group");frame.setAttribute("aria-label","Drawing selected; drag to move or resize");
  const toolbar=el("div","fxie-ink-toolbar");
@@ -689,7 +689,9 @@ function showMovableInk(sheet){
  const more=button("✎","fxie-ink-more","Draw another stroke");
  const done=button("✓","fxie-ink-done","Finish adjusting drawing");
  const remove=button("⌫","fxie-ink-delete","Remove the selected drawing");
- toolbar.append(move,smaller,bigger,more,done,remove);
+ const other=button("⇄ Other page","fxie-ink-other","Move this drawing to the other visible page");
+ if(!splitPage)other.hidden=true;
+ toolbar.append(move,smaller,bigger,other,more,done,remove);
  const width=button("↔","fxie-ink-grip fxie-ink-width","Drag horizontally to resize drawing width");
  const height=button("↕","fxie-ink-grip fxie-ink-height","Drag vertically to resize drawing height");
  const corner=button("⤡","fxie-ink-grip fxie-ink-corner","Drag corner to resize width and height");
@@ -716,9 +718,42 @@ function showMovableInk(sheet){
   if(v.type==="move"){rect.x+=dx;rect.y-=dy}
   if(v.type==="width"||v.type==="free")rect.width=Math.max(12,old.width+dx);
   if(v.type==="height"||v.type==="free"){rect.height=Math.max(12,old.height+dy);rect.y=old.y-dy}
-  state.box=inkConstrain(rect,rendered.originalWidth,rendered.originalHeight);
+  state.box=inkConstrain(rect,w,h);
   updatePosition();
  });
+ async function transferInk(targetPage,clientX=null,clientY=null){
+  if(state.busy||targetPage===state.page||!equalBytes(currentBytes(),state.latestBytes))return;
+  if(targetPage<1||targetPage>app.current().pages)return;
+  state.busy=true;
+  const oldPage=state.page,oldBox={...state.box},oldLatest=state.latestBytes;
+  try{
+   const pdf=await PDFLib.PDFDocument.load(state.baseBytes.slice());
+   const destination=pdf.getPage(targetPage-1),width=destination.getWidth(),height=destination.getHeight();
+   if(destination.getRotation().angle%360!==0)throw Error("Move between rotated pages isn't supported");
+   const targetSurface=targetPage===splitPage?splitPane?.querySelector(".fxie-right-edit-sheet"):$("fxieSheetWrap").querySelector(".fxie-sheet");
+   const targetScale=targetPage===splitPage?Number(targetSurface?.dataset.imageScale)||sc:rendered.scale;
+   let x=oldBox.x,y=height-oldBox.height-oldBox.y;
+   if(targetSurface&&clientX!==null&&clientY!==null){
+    const rect=targetSurface.getBoundingClientRect();
+    const px=(clientX-rect.left)*targetSurface.clientWidth/Math.max(1,rect.width),py=(clientY-rect.top)*targetSurface.clientHeight/Math.max(1,rect.height);
+    x=px/targetScale-oldBox.width/2;y=height-py/targetScale-oldBox.height/2;
+   }
+   state.page=targetPage;state.pageWidth=width;state.pageHeight=height;
+   state.box=inkConstrain({x,y,width:oldBox.width,height:oldBox.height},width,height);
+   paintInkSession(pdf,state);
+   const output=new Uint8Array(await pdf.save({useObjectStreams:true}));
+   if(!equalBytes(currentBytes(),oldLatest))throw Error("PDF changed during move");
+   const previous=app.readCurrent().bytes;fxieRememberUndo(previous);
+   state.latestBytes=output.slice();
+   await app.replace(output);
+   say("Drawing moved to page "+targetPage+". Drag or resize it again, then save.");
+   if(targetPage===splitPage)requestAnimationFrame(()=>{const right=splitPane?.querySelector(".fxie-right-edit-sheet");if(right)showMovableInk(right,targetPage,Number(right.dataset.imageScale)||1,{width,height})});
+   else requestAnimationFrame(()=>{const left=$("fxieSheetWrap").querySelector(".fxie-sheet");if(left)showMovableInk(left)});
+  }catch(err){
+   state.page=oldPage;state.box=oldBox;state.latestBytes=oldLatest;
+   say("Unable to transfer drawing: "+String(err?.message||err),true);
+  }finally{state.busy=false}
+ }
  async function commit(next,previous,description){
   if(state.busy)return;
   if(!equalBytes(currentBytes(),state.latestBytes)){
@@ -732,7 +767,7 @@ function showMovableInk(sheet){
    const updated=new Uint8Array(await doc.save({useObjectStreams:true}));
    if(!equalBytes(currentBytes(),state.latestBytes))throw Error("PDF changed while adjusting drawing");
    const old=app.readCurrent()?.bytes;
-   if(old?.length<8*1024*1024){undo.push(old.slice());if(undo.length>7)undo.shift();redo=[]}
+   if(old)fxieRememberUndo(old);
    state.latestBytes=updated.slice();
    await app.replace(updated);
    say(description||"Drawing updated. Move or resize it again, then Save PDF.");
@@ -746,6 +781,11 @@ function showMovableInk(sheet){
   if(!interaction||interaction.id!==e.pointerId)return;
   e.preventDefault();e.stopPropagation();
   const v=interaction;interaction=null;frame.classList.remove("fxie-ink-dragging");
+  const over=document.elementFromPoint(e.clientX,e.clientY);
+  const targetRight=over?.closest(".fxie-right-edit-sheet");
+  const targetLeft=over?.closest(".fxie-sheet");
+  const targetPage=targetRight?splitPage:targetLeft?app.current()?.page:0;
+  if(v.type==="move"&&targetPage&&targetPage!==state.page){transferInk(targetPage,e.clientX,e.clientY);return}
   const changed=Object.keys(state.box).some(k=>Math.abs(state.box[k]-v.rect[k])>.3);
   if(changed)commit({...state.box},v.rect,"Drawing position and size saved in PDF.");
  });
@@ -759,15 +799,16 @@ function showMovableInk(sheet){
   if(Object.keys(state.box).some(k=>Math.abs(state.box[k]-v.rect[k])>.3))commit({...state.box},v.rect,"Drawing adjusted.");
  });
  const stopEvent=e=>{e.preventDefault();e.stopPropagation()};
- for(const a of [smaller,bigger,more,done,remove])a.addEventListener("pointerdown",stopEvent);
- bigger.onclick=e=>{stopEvent(e);const prior={...state.box},cx=prior.x+prior.width/2,cy=prior.y+prior.height/2;const next=inkConstrain({x:cx-prior.width*.575,y:cy-prior.height*.575,width:prior.width*1.15,height:prior.height*1.15},rendered.originalWidth,rendered.originalHeight);state.box=next;updatePosition();commit(next,prior,"Drawing enlarged and saved.")};
- smaller.onclick=e=>{stopEvent(e);const prior={...state.box},cx=prior.x+prior.width/2,cy=prior.y+prior.height/2;const next=inkConstrain({x:cx-prior.width*.44,y:cy-prior.height*.44,width:prior.width*.88,height:prior.height*.88},rendered.originalWidth,rendered.originalHeight);state.box=next;updatePosition();commit(next,prior,"Drawing made smaller and saved.")};
+ for(const a of [smaller,bigger,other,more,done,remove])a.addEventListener("pointerdown",stopEvent);
+ other.onclick=e=>{stopEvent(e);if(splitPage&&app.current()?.page&&splitPage!==app.current().page)transferInk(state.page===splitPage?app.current().page:splitPage)};
+ bigger.onclick=e=>{stopEvent(e);const prior={...state.box},cx=prior.x+prior.width/2,cy=prior.y+prior.height/2;const next=inkConstrain({x:cx-prior.width*.575,y:cy-prior.height*.575,width:prior.width*1.15,height:prior.height*1.15},w,h);state.box=next;updatePosition();commit(next,prior,"Drawing enlarged and saved.")};
+ smaller.onclick=e=>{stopEvent(e);const prior={...state.box},cx=prior.x+prior.width/2,cy=prior.y+prior.height/2;const next=inkConstrain({x:cx-prior.width*.44,y:cy-prior.height*.44,width:prior.width*.88,height:prior.height*.88},w,h);state.box=next;updatePosition();commit(next,prior,"Drawing made smaller and saved.")};
  done.onclick=e=>{stopEvent(e);frame.remove();say("Drawing saved. Download the PDF to keep your changes.")};
  more.onclick=e=>{stopEvent(e);inkSession=null;frame.remove();setMode("draw");say("Draw your next stroke. It will be selected automatically.")};
  remove.onclick=async e=>{
   stopEvent(e);if(state.busy||!equalBytes(currentBytes(),state.latestBytes))return;
   const previous=app.readCurrent()?.bytes.slice();if(!previous)return;
-  if(previous.length<8*1024*1024){undo.push(previous);if(undo.length>7)undo.shift();redo=[]}
+  fxieRememberUndo(previous);
   inkSession=null;frame.remove();await app.replace(state.baseBytes.slice());
   say("Drawing removed. Use Undo if you want it back.");
  };
@@ -1437,7 +1478,7 @@ async function setSplitView(pageNumber,refresh=false){
   rightSheet.dataset.imageScale=String(metrics.scale);
   rightSheet.append(inkLayer);
   canvasWrap.replaceChildren(rightSheet);
-  requestAnimationFrame(()=>{fxieShowImageControls();findRefreshVisible()});
+  requestAnimationFrame(()=>{fxieShowImageControls();findRefreshVisible();if(inkSession?.page===n)showMovableInk(rightSheet,n,metrics.scale,{width:viewport.width/metrics.scale,height:viewport.height/metrics.scale})});
   const scale=metrics.scale;
   const rightPoint=e=>{
    const rect=rightSheet.getBoundingClientRect();
