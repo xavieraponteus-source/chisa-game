@@ -45,7 +45,7 @@ function draw(d){
  makeTable("pagesTable",d.pages);makeTable("countriesTable",d.countries);makeTable("devicesTable",d.devices);makeTable("sourcesTable",d.sources);
  rows("visitorsTable",d.visitors||[],x=>'<tr><td>'+h(date(x.at))+'</td><td>'+h(x.section)+'</td><td>'+h(x.page)+'</td><td>'+h(x.country||"Unknown")+'</td><td>'+h(x.device||"Unknown")+'</td><td><span class="tag">'+h(x.kind||"Visit")+'</span></td></tr>');
  rows("eventsTable",d.events||[],x=>'<tr><td>'+h(date(x.at))+'</td><td>'+h(x.section)+'</td><td>'+h(x.action)+'</td><td>'+h(x.page||"—")+'</td></tr>');
- const msg=(d.messages||[]);rows("messagesTable",msg,x=>'<tr><td>'+h(date(x.at))+'</td><td>'+h(x.source||"Website")+'</td><td>'+h(x.name||"Visitor")+'</td><td><div class="msg-body"><strong>'+h(x.subject||"Support request")+'</strong><p>'+h(x.body||"")+'</p></div></td><td><span class="tag '+(x.status==="resolved"?"success":"warn")+'">'+h(x.status||"Received")+'</span></td><td>'+ (x.email?'<div class="msg-actions"><a href="mailto:'+encodeURIComponent(x.email).replace(/%40/gi,"@")+'?subject='+encodeURIComponent("Re: "+(x.subject||"Your message"))+'">Reply by email</a></div>':'<span class="muted">No email</span>')+'</td></tr>',"No support messages available yet.");
+ const msg=(d.messages||[]);rows("messagesTable",msg,x=>'<tr><td>'+h(date(x.at))+'</td><td>'+h(x.source||"Website")+'</td><td>'+h(x.name||"Visitor")+'</td><td><div class="msg-body"><strong>'+h(x.subject||"Support request")+'</strong><p>'+h(x.body||"")+'</p></div></td><td><span class="tag '+(x.status==="resolved"?"success":"warn")+'">'+h(x.status||"Received")+'</span></td><td>'+ (x.ticketId?'<button type="button" class="chip" data-ticket="'+Number(x.ticketId)+'">Open thread / Reply</button>':x.email?'<div class="msg-actions"><a href="mailto:'+encodeURIComponent(x.email).replace(/%40/gi,"@")+'?subject='+encodeURIComponent("Re: "+(x.subject||"Your message"))+'">Reply by email</a></div>':'<span class="muted">No email</span>')+'</td></tr>',"No support messages available yet.");
  set("messageCount",num(msg.length));
  const per=(d.sections||[]);bars("sectionBars",per,8);makeTable("sectionsTable",per);
  if(d.notice){set("dataNotice",d.notice);$("dataNotice").classList.remove("hidden")}else $("dataNotice").classList.add("hidden");
@@ -55,6 +55,32 @@ function tab(name){activePage=name;$$("[data-page]").forEach(x=>x.classList.togg
 document.addEventListener("click",e=>{const nav=e.target.closest("[data-nav]");if(nav){tab(nav.dataset.nav);return}const period=e.target.closest("[data-days]");if(period){windowDays=Math.max(1,Math.min(90,Number(period.dataset.days)||30));$$("[data-days]").forEach(el=>el.classList.toggle("active",Number(el.dataset.days)===windowDays));refresh()}});
 $("refresh")?.addEventListener("click",refresh);$("mobileMenu")?.addEventListener("click",()=>$("sidebar")?.classList.toggle("open"));$("export")?.addEventListener("click",()=>{location.href="/admin/export.csv?days="+windowDays});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")$("sidebar")?.classList.remove("open")});
+
+/* Support threads: replies are saved to the website's own Chisa support inbox. */
+document.addEventListener("click",async function(evt){
+ const trigger=evt.target.closest("[data-ticket]");if(!trigger)return;
+ const id=Number(trigger.dataset.ticket);if(!Number.isInteger(id)||id<1)return;
+ const dialog=document.createElement("dialog");dialog.className="fox-reply-dialog";
+ dialog.innerHTML='<div class="reply-top"><h3>Chisa support thread #'+id+'</h3><button type="button" class="chip" id="closeReply">✕ Close</button></div><div class="reply-thread" id="threadMessages"><p class="muted">Loading conversation…</p></div><label for="replyText">Reply to this visitor</label><textarea id="replyText" rows="4" maxlength="3000" placeholder="Write your response…"></textarea><div class="reply-bottom"><p id="replyStatus" class="note">Replies are saved to this website thread. No email is sent automatically.</p><button type="button" class="chip gold" id="sendReply">Save reply</button></div>';
+ document.body.appendChild(dialog);dialog.showModal();
+ const close=()=>dialog.close();dialog.querySelector("#closeReply").onclick=close;dialog.addEventListener("close",()=>dialog.remove());
+ async function loadThread(){
+  const r=await fetch("/admin/ticket/"+id,{credentials:"same-origin",cache:"no-store"});
+  if(!r.ok)throw Error("Unable to load conversation");
+  const data=await r.json();
+  const m=dialog.querySelector("#threadMessages");
+  m.innerHTML=(data.messages||[]).length?data.messages.map(x=>'<div class="thread-message"><b>'+h(x.author||"Visitor")+'</b><small>'+h(date(x.created_at))+'</small><p>'+h(x.body||"")+'</p></div>').join(""):'<div class="empty">No messages in this ticket yet.</div>';
+  m.scrollTop=m.scrollHeight;
+ }
+ try{await loadThread()}catch(err){dialog.querySelector("#threadMessages").textContent=err.message}
+ dialog.querySelector("#sendReply").onclick=async()=>{
+  const content=dialog.querySelector("#replyText").value.trim();
+  if(!content){dialog.querySelector("#replyStatus").textContent="Write a reply first.";return}
+  const button=dialog.querySelector("#sendReply");button.disabled=true;
+  try{const r=await fetch("/admin/ticket/"+id+"/reply",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({reply:content})});if(!r.ok)throw Error((await r.json().catch(()=>({}))).error||"Reply could not be saved");dialog.querySelector("#replyText").value="";dialog.querySelector("#replyStatus").textContent="Reply saved to the website support thread.";await loadThread()}catch(err){dialog.querySelector("#replyStatus").textContent=err.message}finally{button.disabled=false}
+ };
+});
+
 refresh();
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)refresh()});
 })();
