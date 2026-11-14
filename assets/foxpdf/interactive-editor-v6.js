@@ -337,6 +337,8 @@ function fxieShowImageControls(){
  const sheet=surface.sheet,scale=surface.scale;
  fxieImageRescale(state,scale);
  const frame=el("div","fxie-image-selection");
+ // A click synthesized after drag/resize belongs to this selection, not the page-placement tool.
+ frame.addEventListener("click",event=>event.stopPropagation());
  const fit=()=>{const b=fxieImageBounds(state.box,sheet.clientWidth,sheet.clientHeight,0);Object.assign(state.box,b);Object.assign(frame.style,{left:b.x+"px",top:b.y+"px",width:b.width+"px",height:b.height+"px"})};
  frame.setAttribute("role","group");frame.setAttribute("aria-label","Selected image. Drag to move or use resizing handles.");
  const preview=el("img","fxie-image-preview");preview.draggable=false;preview.alt="Inserted image, selectable and resizable";
