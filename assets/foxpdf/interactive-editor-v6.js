@@ -1194,6 +1194,15 @@ async function setSplitView(pageNumber,refresh=false){
    return {x:Math.max(0,Math.min(viewport.width,(e.clientX-rect.left)/rect.width*viewport.width)),
     y:Math.max(0,Math.min(viewport.height,(e.clientY-rect.top)/rect.height*viewport.height))};
   };
+  // Explicit save and unified history controls stay available on either side.
+  const rightActionBar=el("div","fxie-right-session-actions");
+  Object.assign(rightActionBar.style,{position:"absolute",bottom:"8px",right:"8px",zIndex:"20",display:"flex",gap:"6px"});
+  for(const [caption,id] of [["↶ Undo","fxieUndo"],["↷ Redo","fxieRedo"],["⇩ Save","fxieSave"]]){
+   const action=el("button","",caption);action.type="button";action.title=caption;
+   Object.assign(action.style,{borderRadius:"6px",border:"1px solid #c5a052",background:"#1e1c25",color:"#f6e6bd",padding:"7px",minHeight:"38px"});
+   action.onclick=()=>$(id)?.click();rightActionBar.append(action);
+  }
+  rightSheet.append(rightActionBar);
   const rightMutate=async(fn,label)=>{
    if(n>app.current()?.pages){say("This page was removed.",true);return}
    await mutate(async pdf=>{const target=pdf.getPage(n-1);await fn(pdf,target)},label);
@@ -1207,11 +1216,33 @@ async function setSplitView(pageNumber,refresh=false){
    rightImage={type:file.type,bytes:new Uint8Array(await file.arrayBuffer())};
    say("Image selected. Tap where you want it on the right page.");
   });
+  // Non-blocking, touch-friendly inline text editor inside the right pane.
+  const rightTextInput=(initial,at,title)=>new Promise(resolve=>{
+   const editor=el("div","fxie-right-inline-editor");
+   Object.assign(editor.style,{position:"absolute",left:Math.max(0,Math.min(viewport.width-230,at.x))+"px",top:Math.max(0,Math.min(viewport.height-130,at.y))+"px",zIndex:"25",width:"min(270px,95%)",padding:"10px",borderRadius:"10px",border:"2px solid #d6ab55",background:"#18181e",boxShadow:"0 6px 25px #0009"});
+   editor.setAttribute("role","dialog");editor.setAttribute("aria-label",title);
+   const heading=el("label","",title),area=el("textarea");
+   heading.style.color="#f4ddb5";heading.style.display="block";
+   area.value=initial;area.rows=3;area.style.cssText="display:block;width:100%;min-height:64px;max-height:45vh;resize:both;font:16px system-ui;margin:7px 0;color:#1a1a1a;background:#fff;border-radius:5px;padding:6px;";
+   heading.append(area);
+   const controls=el("div");controls.style.cssText="display:flex;justify-content:flex-end;gap:8px;";
+   const cancel=el("button","","Cancel"),apply=el("button","","Apply");
+   cancel.type=apply.type="button";
+   cancel.style.cssText=apply.style.cssText="min-height:42px;padding:8px 12px;border-radius:7px;border:1px solid #d6ab55;color:#fff;background:#343238";
+   let resolved=false;
+   const done=value=>{if(resolved)return;resolved=true;editor.remove();resolve(value)};
+   cancel.onclick=()=>done(null);apply.onclick=()=>done(area.value);
+   editor.addEventListener("pointerdown",e=>e.stopPropagation());
+   editor.addEventListener("click",e=>e.stopPropagation());
+   area.addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault();done(null)}if((e.metaKey||e.ctrlKey)&&e.key==="Enter"){e.preventDefault();done(area.value)}});
+   controls.append(cancel,apply);editor.append(heading,controls);rightSheet.append(editor);
+   requestAnimationFrame(()=>area.focus());
+  });
   const rightTap=async e=>{
    if(splitEditMode==="edit"){say("Tap an existing text region on the right page to edit it.");return}
    const p=rightPoint(e);
    if(splitEditMode==="text"){
-    const value=prompt("Text to add on right page "+n+":",($("fxieInsertText")?.value||""));
+    const value=await rightTextInput(($("fxieInsertText")?.value||""),p,"Add text to page "+n);
     if(value===null||!value.trim())return;
     const size=Number($("fxieSize")?.value)||14;
     await rightMutate(async(pdf,pg)=>{
@@ -1272,7 +1303,7 @@ async function setSplitView(pageNumber,refresh=false){
     button.addEventListener("click",async e=>{
      if(splitEditMode!=="edit")return;
      e.preventDefault();e.stopPropagation();
-     const replacement=prompt("Edit text on right page "+n+":",item.str);
+     const replacement=await rightTextInput(item.str,{x:mat[4],y:mat[5]-size},"Edit text on page "+n);
      if(replacement===null||replacement===item.str)return;
      await rightMutate(async(pdf,pg)=>{
       const font=await fxieEmbedSelectedFont(pdf),sz=Math.max(6,size/scale);
