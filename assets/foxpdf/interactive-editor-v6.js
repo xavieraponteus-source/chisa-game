@@ -1205,7 +1205,7 @@ async function setSplitView(pageNumber,refresh=false){
   rightSheet.append(rightActionBar);
   const rightMutate=async(fn,label)=>{
    if(n>app.current()?.pages){say("This page was removed.",true);return}
-   await mutate(async pdf=>{const target=pdf.getPage(n-1);await fn(pdf,target)},label);
+   await mutate(async pdf=>{if(n<1||n>pdf.getPageCount())throw Error("The target page is no longer available");const target=pdf.getPage(n-1);await fn(pdf,target)},label);
   };
   const imageInput=el("input");imageInput.type="file";imageInput.accept="image/png,image/jpeg";imageInput.hidden=true;
   rightSheet.append(imageInput);
@@ -1230,7 +1230,10 @@ async function setSplitView(pageNumber,refresh=false){
    cancel.type=apply.type="button";
    cancel.style.cssText=apply.style.cssText="min-height:42px;padding:8px 12px;border-radius:7px;border:1px solid #d6ab55;color:#fff;background:#343238";
    let resolved=false;
-   const done=value=>{if(resolved)return;resolved=true;editor.remove();resolve(value)};
+   const done=value=>{if(resolved)return;resolved=true;document.removeEventListener("pointerdown",outsideEditor,true);editor.remove();resolve(value)};
+   const outsideEditor=e=>{if(!editor.contains(e.target))done(area.value.trim()?area.value:null)};
+   // A tap outside finishes the edit; Escape cancels it.
+   setTimeout(()=>{if(!resolved)document.addEventListener("pointerdown",outsideEditor,true)},0);
    cancel.onclick=()=>done(null);apply.onclick=()=>done(area.value);
    editor.addEventListener("pointerdown",e=>e.stopPropagation());
    editor.addEventListener("click",e=>e.stopPropagation());
