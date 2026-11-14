@@ -284,6 +284,8 @@ if(foxHelpForm&&foxHelpInput&&foxHelpMessages){
 }
 
 recentRefresh();switchMode("home");
+// Reveal the completed dashboard only after the new interface is mounted.
+document.documentElement.classList.add("fx-ui-ready");
 if(!window.pdfjsLib){
  const s=document.createElement("script");s.async=true;s.src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";
  s.onload=()=>{if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";if(mode==="editor")thumbRefresh()}};
