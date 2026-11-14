@@ -113,9 +113,12 @@ async function mutate(fn,description){
    await fn(pdf);
    const result=new Uint8Array(await pdf.save({useObjectStreams:true}));
    const live=app.readCurrent();
-   if(!live||live.name!==original.name){say("Document changed during editing. Your original file is safe.",true);return false}
-   fxieRememberUndo(original.bytes);
+   if(!live||live.name!==original.name||!equalBytes(live.bytes,original.bytes)){
+    say("Document changed during editing. Your original file is safe; retry on the current version.",true);return false
+   }
    await app.replace(result);
+   // Only push undo after the PDF write succeeds; failed edits must not pollute history.
+   fxieRememberUndo(original.bytes);
    say(description);
    return true;
   }catch(err){say("Edit failed: "+String(err?.message||err),true);return false}
@@ -302,9 +305,9 @@ async function fxieImageCommit(state){
   const img=type==="image/png"?await pdf.embedPng(bytes):await pdf.embedJpg(bytes);
   pg.drawImage(img,{x,y,width,height});
   const output=new Uint8Array(await pdf.save({useObjectStreams:true}));
-  fxieRememberUndo(current.bytes);
   state.latestBytes=output.slice();state.scale=scale;
-  try{await app.replace(output)}catch(err){state.latestBytes=null;throw err}
+  try{await app.replace(output);fxieRememberUndo(current.bytes)}
+  catch(err){state.latestBytes=null;throw err}
   state.busy=false;
   say("Image applied. Select it to move or resize again, then Apply.");
   fxieShowImageControls();
