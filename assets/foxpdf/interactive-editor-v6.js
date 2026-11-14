@@ -1571,12 +1571,29 @@ async function setSplitView(pageNumber,refresh=false){
    if(!gesture||gesture.id!==e.pointerId)return;
    const g=gesture;gesture=null;g.preview?.remove();
    if(e.type==="pointercancel"||g.points.length<2)return;
-   await rightMutate(async(pdf,pg)=>{
-    const rgb=g.tool==="highlight"?PDFLib.rgb(1,.78,.16):color();
-    const thickness=g.tool==="highlight"?12:Math.max(.75,Number($("fxiePenWidth")?.value)||2.5);
-    const pts=g.tool==="highlight"?[g.start,g.points.at(-1)]:g.points;
-    for(let i=1;i<pts.length;i++)pg.drawLine({start:{x:pts[i-1].x/scale,y:pg.getHeight()-pts[i-1].y/scale},end:{x:pts[i].x/scale,y:pg.getHeight()-pts[i].y/scale},thickness,color:rgb,opacity:g.tool==="highlight"?.38:1});
-   },"Updated "+(g.tool==="highlight"?"highlight":"drawing")+" on right page "+n+".");
+   const strokeBefore=app.readCurrent();
+   if(g.tool==="draw"&&strokeBefore){
+    const thickness=Math.max(.75,Number($("fxiePenWidth")?.value)||2.5);
+    const width=viewport.width/scale,height=viewport.height/scale;
+    const points=g.points.map(p=>({x:Math.max(0,Math.min(width,p.x/scale)),y:Math.max(0,Math.min(height,height-p.y/scale))}));
+    const original=inkRect(points,thickness,width,height);
+    const state={name:strokeBefore.name,page:n,pageWidth:width,pageHeight:height,
+     baseBytes:strokeBefore.bytes.slice(),latestBytes:null,points,original,box:{...original},
+     thickness,hex:$("#fxieColor")?.value||"#172846",busy:false};
+    const ok=await mutate(pdf=>paintInkSession(pdf,state),"Drawing added to right page "+n+". Drag the selection to the other page.");
+    if(ok){
+     inkSession=state;state.latestBytes=app.readCurrent()?.bytes.slice()||null;
+     splitEditMode="edit";
+     splitPane?.querySelectorAll("[data-right-tool]").forEach(b=>{const yes=b.dataset.rightTool==="edit";b.classList.toggle("selected",yes);b.setAttribute("aria-pressed",String(yes))});
+     const sheet=splitPane?.querySelector(".fxie-right-edit-sheet");
+     if(sheet){sheet.querySelector(".fxie-right-ink")?.style.setProperty("pointer-events","none");showMovableInk(sheet,n,scale,{width,height})}
+    }
+   }else{
+    await rightMutate(async(pdf,pg)=>{
+     const pts=[g.start,g.points.at(-1)],rgb=PDFLib.rgb(1,.78,.16);
+     for(let i=1;i<pts.length;i++)pg.drawLine({start:{x:pts[i-1].x/scale,y:pg.getHeight()-pts[i-1].y/scale},end:{x:pts[i].x/scale,y:pg.getHeight()-pts[i].y/scale},thickness:12,color:rgb,opacity:.38});
+    },"Highlighted region on right page "+n+".");
+   }
   };
   inkLayer.addEventListener("pointerup",finishRight);inkLayer.addEventListener("pointercancel",finishRight);
   try{
