@@ -30,7 +30,7 @@ let moveSession=null,dragTextHandle=null; // Last locally applied text remains r
 let inkSession=null; // Most recently drawn stroke, movable and resizable.
 const say=(message,bad=false)=>{const s=$("fxieStatus");s.textContent=message;s.dataset.bad=bad?"1":"0"};
 function check(){const d=app.current();if(!d){app.say("Please open a PDF first.");app.open();return null}return d}
-function setMode(m){mode=m;view.classList.remove("fxie-drawer-closed");view.dataset.mode=m;selected=null;closeInline();const sheet=$("fxieSheetWrap").querySelector(".fxie-sheet");if(sheet){showMovableText(sheet);showMovableInk(sheet);}$("fxieReplaceBox").hidden=true;$("fxieInsertBox").hidden=m!=="text";for(const b of view.querySelectorAll("[data-mode]"))b.classList.toggle("selected",b.dataset.mode===m);for(const [id,key] of [["fxieSelect","select"],["fxieText","text"],["fxieImage","image"],["fxieHighlight","highlight"],["fxieDraw","draw"]])$(id).classList.toggle("selected",m===key);
+function setMode(m){mode=m;view.classList.remove("fxie-drawer-closed");view.dataset.mode=m;selected=null;closeInline();const sheet=$("fxieSheetWrap").querySelector(".fxie-sheet");if(sheet){showMovableText(sheet);showMovableInk(sheet);fxieShowImageControls();}$("fxieReplaceBox").hidden=true;$("fxieInsertBox").hidden=m!=="text";for(const b of view.querySelectorAll("[data-mode]"))b.classList.toggle("selected",b.dataset.mode===m);for(const [id,key] of [["fxieSelect","select"],["fxieText","text"],["fxieImage","image"],["fxieHighlight","highlight"],["fxieDraw","draw"]])$(id).classList.toggle("selected",m===key);
 say(({select:"Select a text region on the page.",edit:"Click existing text to edit its paragraph.",text:"Enter text on the left, then click the page.",image:"Choose a picture, then click where it should go.",highlight:"Drag across a region on the page.",draw:"Draw on the PDF using your finger, mouse, or stylus. Tap Save PDF afterward."})[m]);if(m==="image"&&!pendingImage)$("fxieImageFile").click()}
 async function getJs(){if(window.pdfjsLib)return window.pdfjsLib;if(!window.fxieJS)window.fxieJS=new Promise((resolve,reject)=>{const script=document.createElement("script");script.src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";script.onload=()=>{if(!window.pdfjsLib)return reject(Error("PDF renderer not found"));pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";resolve(pdfjsLib)};script.onerror=()=>reject(Error("PDF renderer could not load"));document.head.append(script)});return window.fxieJS}
 function point(e){if(!rendered)return null;const r=rendered.canvas.getBoundingClientRect();if(!r.width||!r.height)return null;return{x:(e.clientX-r.left)/r.width*rendered.w,y:(e.clientY-r.top)/r.height*rendered.h}}
@@ -91,7 +91,7 @@ try{
  }else pageFrame.replaceChildren(sheet);
  if(lastPdf&&lastPdf!==reader)lastPdf.destroy?.();lastPdf=reader;
  rendered={scale,canvas,overlay,w:vp.width,h:vp.height,page:page,originalWidth:base.width,originalHeight:base.height};
- showMovableText(sheet);showMovableInk(sheet);
+ showMovableText(sheet);showMovableInk(sheet);fxieShowImageControls();
  say("Page "+d.page+" · "+count+" selectable text regions");
 }catch(e){$("fxieSheetWrap").replaceChildren(el("p","fxie-error","Unable to show page: "+e.message));say("PDF rendering failed: "+e.message,true)}
 }
@@ -246,8 +246,135 @@ async function placeText(p){
  const success=await mutate(async pdf=>paintMovableText(pdf,session),"Text inserted. Drag its blue border to reposition it.");
  if(success){setMode("select");rememberMovable(session);}
 }
-$("fxieImageFile").onchange=async e=>{const f=e.target.files?.[0];e.target.value="";if(!f)return;if(!["image/png","image/jpeg"].includes(f.type)||f.size>8*1024*1024)return say("Select a PNG/JPEG smaller than 8 MB.",true);pendingImage={bytes:new Uint8Array(await f.arrayBuffer()),type:f.type};say("Image ready. Click the PDF to place it.")};
-async function placeImage(p){if(!p||!check())return;if(!pendingImage)return $("fxieImageFile").click();await mutate(async pdf=>{const pg=pdf.getPage(app.current().page-1),img=pendingImage.type==="image/png"?await pdf.embedPng(pendingImage.bytes):await pdf.embedJpg(pendingImage.bytes),w=Math.min(200,img.width,pg.getWidth()*.45),h=w*img.height/img.width;pg.drawImage(img,{x:Math.max(0,Math.min(pg.getWidth()-w,p.x/rendered.scale)),y:Math.max(0,Math.min(pg.getHeight()-h,pg.getHeight()-p.y/rendered.scale-h)),width:w,height:h})},"Image inserted in PDF.")}
+/* Fast image placement: preview, drag, free/ratio resizing and apply without
+   re-encoding a PDF until the user finishes. Both page panes share this engine.
+   Existing PDF images are not claimed as individually selectable objects. */
+let fxieImageSession=null,fxieImageObjectUrl=null;
+function fxiePreviewURL(asset){
+ if(fxieImageObjectUrl)URL.revokeObjectURL(fxieImageObjectUrl);
+ fxieImageObjectUrl=URL.createObjectURL(new Blob([asset.bytes],{type:asset.type}));
+ return fxieImageObjectUrl;
+}
+function fxiePrepareImage(asset){
+ return new Promise((resolve,reject)=>{
+  const url=fxiePreviewURL(asset),img=new Image();
+  img.onload=()=>resolve({url,naturalWidth:img.naturalWidth,naturalHeight:img.naturalHeight});
+  img.onerror=()=>reject(Error("Cannot preview this image"));img.src=url;
+ });
+}
+function fxieImageBounds(box,w,h){
+ const width=Math.max(24,Math.min(w,box.width)),height=Math.max(24,Math.min(h,box.height));
+ return {x:Math.max(0,Math.min(w-width,box.x)),y:Math.max(0,Math.min(h-height,box.y)),width,height};
+}
+function fxieImageSurface(){
+ const state=fxieImageSession;if(!state)return null;
+ const left=app.current();
+ if(left?.page===state.page)return {sheet:$("fxieSheetWrap").querySelector(".fxie-sheet"),scale:rendered?.scale||1};
+ if(splitPage===state.page){const sheet=splitPane?.querySelector(".fxie-right-edit-sheet");return {sheet,scale:Number(sheet?.dataset.imageScale)||1}}
+ return null;
+}
+function fxieImageStage(asset,page,p,scale){
+ const doc=app.readCurrent();if(!doc)return;
+ const img=asset.preview;if(!img)return say("Image preview is still loading.",true);
+ const width=Math.min(190,Math.max(65,img.naturalWidth*scale*.65));
+ const height=width*img.naturalHeight/img.naturalWidth;
+ const pageInfo=fxieImageSurface(),bounds=pageInfo?.sheet;
+ const box=fxieImageBounds({x:p.x,y:p.y,width,height},bounds?.clientWidth||Math.max(p.x+width,400),bounds?.clientHeight||Math.max(p.y+height,550));
+ fxieImageSession={name:doc.name,page,asset,box,baseBytes:doc.bytes.slice(),latestBytes:null,busy:false};
+ if(!fxieImageObjectUrl||img.url!==fxieImageObjectUrl)fxiePreviewURL(asset);
+ fxieShowImageControls();
+ say("Image placed. Drag to move; drag a corner to resize; tap Apply when ready.");
+}
+async function fxieImageCommit(state){
+ if(state.busy)return;
+ state.busy=true;
+ const job=async()=>{
+  const current=app.readCurrent();
+  if(!current||current.name!==state.name||!equalBytes(current.bytes,state.latestBytes||state.baseBytes))throw Error("The document changed. Reinsert the image to avoid overwriting other edits.");
+  const pdf=await PDFLib.PDFDocument.load(state.baseBytes.slice());
+  const pg=pdf.getPage(state.page-1),w=pg.getWidth(),h=pg.getHeight();
+  const view=fxieImageSurface();
+  const scale=view?.scale||state.scale||1;
+  const x=Math.max(0,Math.min(w-2,state.box.x/scale)),width=Math.min(w-x,state.box.width/scale);
+  const height=Math.min(h,state.box.height/scale),y=Math.max(0,Math.min(h-height,h-(state.box.y+state.box.height)/scale));
+  const bytes=state.asset.bytes,type=state.asset.type;
+  const img=type==="image/png"?await pdf.embedPng(bytes):await pdf.embedJpg(bytes);
+  pg.drawImage(img,{x,y,width,height});
+  const output=new Uint8Array(await pdf.save({useObjectStreams:true}));
+  fxieRememberUndo(current.bytes);
+  await app.replace(output);
+  state.latestBytes=output.slice();state.scale=scale;
+  state.busy=false;
+  say("Image applied. Select it to move or resize again, then Apply.");
+  fxieShowImageControls();
+  return true;
+ };
+ const run=fxieMutationChain.then(job,job);
+ fxieMutationChain=run.catch(()=>{});
+ try{return await run}catch(err){state.busy=false;say("Image edit not applied: "+String(err?.message||err),true);return false}
+}
+function fxieShowImageControls(){
+ const state=fxieImageSession;
+ document.querySelectorAll(".fxie-image-selection").forEach(x=>x.remove());
+ if(!state)return;
+ const current=app.readCurrent();
+ if(!current||current.name!==state.name||!equalBytes(current.bytes,state.latestBytes||state.baseBytes)){fxieImageSession=null;return}
+ const surface=fxieImageSurface();
+ if(!surface?.sheet)return;
+ const sheet=surface.sheet,scale=surface.scale;
+ state.scale=scale;
+ const frame=el("div","fxie-image-selection");
+ const fit=()=>{const b=fxieImageBounds(state.box,sheet.clientWidth,sheet.clientHeight);Object.assign(state.box,b);Object.assign(frame.style,{left:b.x+"px",top:b.y+"px",width:b.width+"px",height:b.height+"px"})};
+ frame.setAttribute("role","group");frame.setAttribute("aria-label","Selected image. Drag to move or use resizing handles.");
+ const preview=el("img","fxie-image-preview");preview.draggable=false;preview.alt="Inserted image, selectable and resizable";
+ preview.src=state.asset.preview.url;frame.append(preview);
+ const toolbar=el("div","fxie-image-toolbar");
+ const button=(caption,action,title)=>{const b=el("button","fxie-image-action",caption);b.type="button";b.title=title;b.setAttribute("aria-label",title);b.onclick=e=>{e.stopPropagation();action()};toolbar.append(b);return b};
+ button("✓ Apply",()=>fxieImageCommit(state),"Apply image to PDF");
+ button("−",()=>{state.box.width*=.85;state.box.height*=.85;fit()},"Make image smaller");
+ button("+",()=>{state.box.width*=1.15;state.box.height*=1.15;fit()},"Make image bigger");
+ button("⌫",async()=>{if(state.latestBytes){const current=app.readCurrent();if(!current||!equalBytes(current.bytes,state.latestBytes))return;fxieRememberUndo(current.bytes);await app.replace(state.baseBytes.slice())}fxieImageSession=null;frame.remove();say("Image removed.");},"Remove selected image");
+ button("Done",()=>{frame.remove();say("Image controls closed. Select Image to add another.")},"Finish selecting image");
+ frame.append(toolbar);
+ const grip=el("button","fxie-image-resize","⤡");grip.type="button";grip.title="Drag to resize image";
+ frame.append(grip);
+ const widthGrip=el("button","fxie-image-resize fxie-image-width","↔");widthGrip.type="button";widthGrip.title="Resize image width";frame.append(widthGrip);
+ const heightGrip=el("button","fxie-image-resize fxie-image-height","↕");heightGrip.type="button";heightGrip.title="Resize image height";frame.append(heightGrip);
+ let pointer=null;
+ frame.addEventListener("pointerdown",e=>{
+  if(e.target.closest(".fxie-image-toolbar"))return;
+  e.stopPropagation();e.preventDefault();
+  const resizing=e.target.closest(".fxie-image-resize");
+  pointer={id:e.pointerId,x:e.clientX,y:e.clientY,box:{...state.box},resize:resizing?.classList.contains("fxie-image-width")?"width":resizing?.classList.contains("fxie-image-height")?"height":resizing?"both":"move"};
+  frame.setPointerCapture(e.pointerId);
+ });
+ frame.addEventListener("pointermove",e=>{
+  if(!pointer||pointer.id!==e.pointerId)return;
+  const rect=sheet.getBoundingClientRect(),dx=(e.clientX-pointer.x)*sheet.clientWidth/Math.max(1,rect.width),dy=(e.clientY-pointer.y)*sheet.clientHeight/Math.max(1,rect.height);
+  const start=pointer.box;
+  const next={...start};
+  if(pointer.resize==="move"){next.x+=dx;next.y+=dy}
+  else{if(pointer.resize!=="height")next.width=Math.max(24,start.width+dx);if(pointer.resize!=="width")next.height=Math.max(24,start.height+dy)}
+  state.box=fxieImageBounds(next,sheet.clientWidth,sheet.clientHeight);fit();
+ });
+ frame.addEventListener("pointerup",e=>{if(pointer?.id===e.pointerId){pointer=null;say("Image adjusted. Tap Apply to save its position.")}});
+ frame.addEventListener("pointercancel",()=>{pointer=null});
+ fit();sheet.append(frame);
+}
+$("fxieImageFile").onchange=async e=>{
+ const f=e.target.files?.[0];e.target.value="";if(!f)return;
+ if(!["image/png","image/jpeg"].includes(f.type)||f.size>12*1024*1024)return say("Select a PNG/JPEG under 12 MB.",true);
+ try{
+  const bytes=new Uint8Array(await f.arrayBuffer()),asset={bytes,type:f.type};
+  asset.preview=await fxiePrepareImage(asset);pendingImage=asset;
+  say("Image ready. Tap either PDF page to place, move, and resize it.");
+ }catch(e){say("Unable to load image: "+e.message,true)}
+};
+function placeImage(p){
+ const doc=check();if(!p||!doc)return;
+ if(!pendingImage){$("fxieImageFile").click();return}
+ fxieImageStage(pendingImage,doc.page,p,rendered.scale);
+}
 function drawHighlightPreview(overlay){overlay.replaceChildren();const a=drawing.start,b=drawing.end;if(!a||!b)return;const square=el("div","fxie-highlight-box");Object.assign(square.style,{left:Math.min(a.x,b.x)+"px",top:Math.min(a.y,b.y)+"px",width:Math.abs(a.x-b.x)+"px",height:Math.abs(a.y-b.y)+"px"});overlay.append(square)}
 async function applyHighlight(t){if(!t.start||!t.end)return;const a=t.start,b=t.end,x=Math.min(a.x,b.x),y=Math.min(a.y,b.y),w=Math.abs(a.x-b.x),h=Math.abs(a.y-b.y);if(w<4||h<4)return;await mutate(async pdf=>{pdf.getPage(app.current().page-1).drawRectangle({x:x/rendered.scale,y:(rendered.h-y-h)/rendered.scale,width:w/rendered.scale,height:h/rendered.scale,color:PDFLib.rgb(1,.77,.22),opacity:.24})},"Highlighted region. For privacy use Permanent Redaction.")}
 
@@ -1186,8 +1313,10 @@ async function setSplitView(pageNumber,refresh=false){
   const inkLayer=el("div","fxie-right-ink");
   Object.assign(inkLayer.style,{position:"absolute",inset:"0",touchAction:"none",pointerEvents:"auto"});
   inkLayer.style.pointerEvents=splitEditMode==="edit"?"none":"auto";
+  rightSheet.dataset.imageScale=String(metrics.scale);
   rightSheet.append(inkLayer);
   canvasWrap.replaceChildren(rightSheet);
+  requestAnimationFrame(fxieShowImageControls);
   const scale=metrics.scale;
   const rightPoint=e=>{
    const rect=rightSheet.getBoundingClientRect();
@@ -1209,12 +1338,11 @@ async function setSplitView(pageNumber,refresh=false){
   };
   const imageInput=el("input");imageInput.type="file";imageInput.accept="image/png,image/jpeg";imageInput.hidden=true;
   rightSheet.append(imageInput);
-  let rightImage=null;
   imageInput.addEventListener("change",async e=>{
-   const file=e.target.files?.[0];if(!file)return;
-   if(file.size>12*1024*1024){say("Choose an image under 12 MB.",true);return}
-   rightImage={type:file.type,bytes:new Uint8Array(await file.arrayBuffer())};
-   say("Image selected. Tap where you want it on the right page.");
+   const file=e.target.files?.[0];e.target.value="";if(!file)return;
+   if(!["image/png","image/jpeg"].includes(file.type)||file.size>12*1024*1024)return say("Choose a PNG/JPEG under 12 MB.",true);
+   try{const asset={type:file.type,bytes:new Uint8Array(await file.arrayBuffer())};asset.preview=await fxiePrepareImage(asset);pendingImage=asset;say("Image ready. Tap the right page to position it.");}
+   catch(err){say("Image could not load: "+err.message,true)}
   });
   // Non-blocking, touch-friendly inline text editor inside the right pane.
   const rightTextInput=(initial,at,title)=>new Promise(resolve=>{
@@ -1253,12 +1381,8 @@ async function setSplitView(pageNumber,refresh=false){
      pg.drawText(value,{x:p.x/scale,y:pg.getHeight()-p.y/scale-size,size,font,color:color(),maxWidth:Math.max(20,pg.getWidth()-p.x/scale-5),lineHeight:size*1.2});
     },"Added text directly to right page "+n+".");
    }else if(splitEditMode==="image"){
-    if(!rightImage){imageInput.click();return}
-    await rightMutate(async(pdf,pg)=>{
-     const img=rightImage.type==="image/png"?await pdf.embedPng(rightImage.bytes):await pdf.embedJpg(rightImage.bytes);
-     const w=Math.min(img.width,200,pg.getWidth()*.45),h=w*img.height/img.width;
-     pg.drawImage(img,{x:Math.max(0,Math.min(pg.getWidth()-w,p.x/scale)),y:Math.max(0,Math.min(pg.getHeight()-h,pg.getHeight()-p.y/scale-h)),width:w,height:h});
-    },"Added image directly to right page "+n+".");
+    if(!pendingImage){imageInput.click();return}
+    fxieImageStage(pendingImage,n,p,scale);
    }
   };
   let gesture=null;
