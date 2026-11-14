@@ -275,12 +275,13 @@ function fxieImageSurface(){
 }
 function fxieImageStage(asset,page,p,scale){
  const doc=app.readCurrent();if(!doc)return;
+ if(fxieImageSession?.latestBytes&&!equalBytes(doc.bytes,fxieImageSession.latestBytes))fxieImageSession=null;
  const img=asset.preview;if(!img)return say("Image preview is still loading.",true);
  const width=Math.min(190,Math.max(65,img.naturalWidth*scale*.65));
  const height=width*img.naturalHeight/img.naturalWidth;
- const pageInfo=fxieImageSurface(),bounds=pageInfo?.sheet;
+ const bounds=(app.current()?.page===page?$("fxieSheetWrap").querySelector(".fxie-sheet"):splitPane?.querySelector(".fxie-right-edit-sheet"));
  const box=fxieImageBounds({x:p.x,y:p.y,width,height},bounds?.clientWidth||Math.max(p.x+width,400),bounds?.clientHeight||Math.max(p.y+height,550));
- fxieImageSession={name:doc.name,page,asset,box,baseBytes:doc.bytes.slice(),latestBytes:null,busy:false};
+ fxieImageSession={name:doc.name,page,asset,box,scale,baseBytes:doc.bytes.slice(),latestBytes:null,busy:false};
  if(!fxieImageObjectUrl||img.url!==fxieImageObjectUrl)fxiePreviewURL(asset);
  fxieShowImageControls();
  say("Image placed. Drag to move; drag a corner to resize; tap Apply when ready.");
@@ -302,8 +303,8 @@ async function fxieImageCommit(state){
   pg.drawImage(img,{x,y,width,height});
   const output=new Uint8Array(await pdf.save({useObjectStreams:true}));
   fxieRememberUndo(current.bytes);
-  await app.replace(output);
   state.latestBytes=output.slice();state.scale=scale;
+  try{await app.replace(output)}catch(err){state.latestBytes=null;throw err}
   state.busy=false;
   say("Image applied. Select it to move or resize again, then Apply.");
   fxieShowImageControls();
