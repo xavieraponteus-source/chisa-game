@@ -329,13 +329,31 @@ function fxieShowImageControls(){
  frame.setAttribute("role","group");frame.setAttribute("aria-label","Selected image. Drag to move or use resizing handles.");
  const preview=el("img","fxie-image-preview");preview.draggable=false;preview.alt="Inserted image, selectable and resizable";
  preview.src=state.asset.preview.url;frame.append(preview);
+ const transferImage=async(targetPage,clientX=null,clientY=null)=>{
+  if(!targetPage||targetPage===state.page||!app.current()||state.busy)return;
+  const target=targetPage===splitPage?splitPane?.querySelector(".fxie-right-edit-sheet"):$("fxieSheetWrap").querySelector(".fxie-sheet");
+  if(!target)return say("Open both pages first.",true);
+  const targetScale=targetPage===splitPage?Number(target.dataset.imageScale)||1:rendered?.scale||1;
+  const physicalWidth=state.box.width/Math.max(.1,scale),physicalHeight=state.box.height/Math.max(.1,scale);
+  const width=physicalWidth*targetScale,height=physicalHeight*targetScale;
+  const rect=target.getBoundingClientRect();
+  const centerX=clientX===null?target.clientWidth/2:(clientX-rect.left)*target.clientWidth/Math.max(1,rect.width);
+  const centerY=clientY===null?target.clientHeight/2:(clientY-rect.top)*target.clientHeight/Math.max(1,rect.height);
+  const beforePage=state.page,beforeBox={...state.box};
+  state.page=targetPage;state.scale=targetScale;
+  state.box=fxieImageBounds({x:centerX-width/2,y:centerY-height/2,width,height},target.clientWidth,target.clientHeight);
+  fxieShowImageControls();
+  const worked=await fxieImageCommit(state);
+  if(!worked){state.page=beforePage;state.box=beforeBox;fxieShowImageControls()}
+ };
  const toolbar=el("div","fxie-image-toolbar");
  const button=(caption,action,title)=>{const b=el("button","fxie-image-action",caption);b.type="button";b.title=title;b.setAttribute("aria-label",title);b.onclick=e=>{e.stopPropagation();action()};toolbar.append(b);return b};
  button("✓ Apply",()=>fxieImageCommit(state),"Apply image to PDF");
  button("−",()=>{state.box.width*=.85;state.box.height*=.85;fit()},"Make image smaller");
  button("+",()=>{state.box.width*=1.15;state.box.height*=1.15;fit()},"Make image bigger");
+ if(splitPage&&app.current()?.page!==splitPage)button("⇄ Page",()=>transferImage(state.page===splitPage?app.current().page:splitPage),"Move image to other visible page");
  button("⌫",async()=>{if(state.latestBytes){const current=app.readCurrent();if(!current||!equalBytes(current.bytes,state.latestBytes))return;fxieRememberUndo(current.bytes);await app.replace(state.baseBytes.slice())}fxieImageSession=null;frame.remove();say("Image removed.");},"Remove selected image");
- button("Done",()=>{frame.remove();say("Image controls closed. Select Image to add another.")},"Finish selecting image");
+ button("Done",()=>{fxieImageSession=null;frame.remove();say("Image selection finished. Save the PDF to keep your changes.")},"Finish selecting image");
  frame.append(toolbar);
  const grip=el("button","fxie-image-resize","⤡");grip.type="button";grip.title="Drag to resize image";
  frame.append(grip);
@@ -358,7 +376,17 @@ function fxieShowImageControls(){
   else{if(pointer.resize!=="height")next.width=Math.max(24,start.width+dx);if(pointer.resize!=="width")next.height=Math.max(24,start.height+dy)}
   state.box=fxieImageBounds(next,sheet.clientWidth,sheet.clientHeight);fit();
  });
- frame.addEventListener("pointerup",e=>{if(pointer?.id===e.pointerId){pointer=null;say("Image adjusted. Tap Apply to save its position.")}});
+ frame.addEventListener("pointerup",e=>{
+  if(pointer?.id!==e.pointerId)return;
+  const prior=pointer;pointer=null;
+  if(prior.resize==="move"){
+   const over=document.elementFromPoint(e.clientX,e.clientY);
+   const right=over?.closest(".fxie-right-edit-sheet"),left=over?.closest(".fxie-sheet");
+   const targetPage=right?splitPage:left?app.current()?.page:0;
+   if(targetPage&&targetPage!==state.page){transferImage(targetPage,e.clientX,e.clientY);return}
+  }
+  say("Image adjusted. Tap Apply to save its position.");
+ });
  frame.addEventListener("pointercancel",()=>{pointer=null});
  fit();sheet.append(frame);
 }
