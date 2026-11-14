@@ -23,6 +23,7 @@ view.innerHTML=[
 ].join("");
 main.append(view);
 let mode="select",zoom="fit",renderVersion=0,rendered=null,selected=null,inspectCache=null,consentKey="",undo=[],redo=[],historyName="",pendingImage=null,drawing=null,lastPdf=null,inkStroke=null;
+let moveSession=null,dragTextHandle=null; // Last locally applied text remains repositionable.
 const say=(message,bad=false)=>{const s=$("fxieStatus");s.textContent=message;s.dataset.bad=bad?"1":"0"};
 function check(){const d=app.current();if(!d){app.say("Please open a PDF first.");app.open();return null}return d}
 function setMode(m){mode=m;view.classList.remove("fxie-drawer-closed");view.dataset.mode=m;selected=null;$("fxieReplaceBox").hidden=true;$("fxieInsertBox").hidden=m!=="text";for(const b of view.querySelectorAll("[data-mode]"))b.classList.toggle("selected",b.dataset.mode===m);for(const [id,key] of [["fxieSelect","select"],["fxieText","text"],["fxieImage","image"],["fxieHighlight","highlight"],["fxieDraw","draw"]])$(id).classList.toggle("selected",m===key);
@@ -86,6 +87,7 @@ try{
  }else pageFrame.replaceChildren(sheet);
  if(lastPdf&&lastPdf!==reader)lastPdf.destroy?.();lastPdf=reader;
  rendered={scale,canvas,overlay,w:vp.width,h:vp.height,page:page,originalWidth:base.width,originalHeight:base.height};
+ showMovableText(sheet);
  say("Page "+d.page+" · "+count+" selectable text regions");
 }catch(e){$("fxieSheetWrap").replaceChildren(el("p","fxie-error","Unable to show page: "+e.message));say("PDF rendering failed: "+e.message,true)}
 }
@@ -153,9 +155,66 @@ $("fxieFontScan").onclick=async ()=>{
  }catch(err){say("Font access denied or unsupported. Import TTF/OTF instead.",true);}
 };
 
-function color(){const s=$("fxieColor").value.slice(1);return PDFLib.rgb(parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255)}
-async function placeText(p){if(!p||!check())return;const text=$("fxieInsertText").value.trim();if(!text)return say("Type some text first.",true);const size=Number($("fxieSize").value);if(size<5||size>80)return say("Font size must be between 5 and 80.",true);
-await mutate(async pdf=>{const pg=pdf.getPage(app.current().page-1),font=await fxieEmbedSelectedFont(pdf,$("fxieFont").value);const x=p.x/rendered.scale,y=pg.getHeight()-p.y/rendered.scale-size;pg.drawText(text,{x,y,font,size,color:color(),maxWidth:pg.getWidth()-x-8,lineHeight:size*1.32})},"Text added to page "+app.current().page+".")}
+
+function color(){return textInk($("fxieColor").value)}
+function textInk(hex){const v=String(hex||"#172846").replace("#","");return PDFLib.rgb(parseInt(v.slice(0,2),16)/255,parseInt(v.slice(2,4),16)/255,parseInt(v.slice(4,6),16)/255)}
+/* FXIE_MOVABLE_TEXT_V14 — local visual text can be dragged, resized in the textarea,
+   repositioned after Apply, and saved into PDF content without a cloud upload.
+   Each drag recomposes the most recently edited text from its pre-edit PDF,
+   preventing overlapping duplicates from repeated moves. */
+async function paintMovableText(doc,session){
+ const pg=doc.getPage(session.page-1),dimensions=pg.getSize();
+ if(pg.getRotation().angle%360!==0)throw Error("This rotated page cannot be edited locally yet. Use Advanced reflow.");
+ if(session.cover){
+  const b=session.cover.box,sc=b.scale;
+  const x=Math.max(0,b.x/sc),height=Math.max(2,b.height/sc),width=Math.max(2,b.width/sc);
+  const baseline=dimensions.height-b.baseline/sc,coverY=Math.max(0,baseline-2.1);
+  const coverHeight=Math.min(dimensions.height-coverY,height+5);
+  if(x+width>dimensions.width+5||coverY+coverHeight>dimensions.height+1)throw Error("Original text region outside page.");
+  pg.drawRectangle({x:Math.max(0,x-1.3),y:coverY,width:Math.min(width+3.5,dimensions.width-x+1.3),height:coverHeight,color:PDFLib.rgb(...session.cover.background.map(v=>v/255))});
+ }
+ if(!session.text.trim())return;
+ const font=await fxieEmbedSelectedFont(doc,session.fontName),size=session.size;
+ const destX=Math.max(0,Math.min(dimensions.width-6,session.x));
+ const destY=Math.max(0,Math.min(dimensions.height-size*.25,session.y));
+ const width=Math.max(12,Math.min(dimensions.width-destX-3,session.width));
+ pg.drawText(session.text,{x:destX,y:destY,font,size,color:textInk(session.hex),maxWidth:width,lineHeight:size*1.16});
+}
+function currentBytes(){return app.readCurrent()?.bytes||null}
+function equalBytes(a,b){
+ if(!a||!b||a.length!==b.length)return false;
+ if(a===b)return true;
+ // Check the whole byte sequence before rewriting a PDF, to avoid overwriting later edits.
+ for(let i=0;i<a.length;i++)if(a[i]!==b[i])return false;
+ return true;
+}
+function rememberMovable(session,description){
+ if(!session)return;
+ const bytes=currentBytes();
+ if(!bytes)return;
+ session.latestBytes=bytes.slice();
+ moveSession=session;
+ requestAnimationFrame(()=>{
+  const sheet=$("fxieSheetWrap").querySelector(".fxie-sheet");
+  if(sheet&&rendered&&app.current()?.page===session.page)showMovableText(sheet);
+ });
+ say(description||"Text applied. Drag the blue outline to move it; Save PDF keeps its position.");
+}
+async function placeText(p){
+ if(!p||!check())return;
+ const value=$("fxieInsertText").value;
+ if(!value.trim())return say("Type some text first.",true);
+ const size=Number($("fxieSize").value);
+ if(size<5||size>80)return say("Font size must be between 5 and 80.",true);
+ const d=app.current(),orig=app.readCurrent(),scale=rendered.scale;
+ const fontName=$("fxieFont").value,hex=$("fxieColor").value;
+ const x=p.x/scale,y=rendered.originalHeight-p.y/scale-size;
+ const session={page:d.page,name:d.name,baseBytes:orig.bytes.slice(),text:value,size,fontName,hex,
+  fontFamily:$("fxieFont").selectedOptions[0]?.textContent||"Arial",x,y,
+  width:Math.max(18,rendered.originalWidth-x-8),cover:null};
+ const success=await mutate(async pdf=>paintMovableText(pdf,session),"Text inserted. Drag its blue border to reposition it.");
+ if(success){setMode("select");rememberMovable(session);}
+}
 $("fxieImageFile").onchange=async e=>{const f=e.target.files?.[0];e.target.value="";if(!f)return;if(!["image/png","image/jpeg"].includes(f.type)||f.size>8*1024*1024)return say("Select a PNG/JPEG smaller than 8 MB.",true);pendingImage={bytes:new Uint8Array(await f.arrayBuffer()),type:f.type};say("Image ready. Click the PDF to place it.")};
 async function placeImage(p){if(!p||!check())return;if(!pendingImage)return $("fxieImageFile").click();await mutate(async pdf=>{const pg=pdf.getPage(app.current().page-1),img=pendingImage.type==="image/png"?await pdf.embedPng(pendingImage.bytes):await pdf.embedJpg(pendingImage.bytes),w=Math.min(200,img.width,pg.getWidth()*.45),h=w*img.height/img.width;pg.drawImage(img,{x:Math.max(0,Math.min(pg.getWidth()-w,p.x/rendered.scale)),y:Math.max(0,Math.min(pg.getHeight()-h,pg.getHeight()-p.y/rendered.scale-h)),width:w,height:h})},"Image inserted in PDF.")}
 function drawHighlightPreview(overlay){overlay.replaceChildren();const a=drawing.start,b=drawing.end;if(!a||!b)return;const square=el("div","fxie-highlight-box");Object.assign(square.style,{left:Math.min(a.x,b.x)+"px",top:Math.min(a.y,b.y)+"px",width:Math.abs(a.x-b.x)+"px",height:Math.abs(a.y-b.y)+"px"});overlay.append(square)}
@@ -264,24 +323,45 @@ function samplePixels(box){
  return{background:bg,ink,uniform:deviation<48};
 }
 function cssColor(parts){return "#"+parts.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,"0")).join("")}
+
 function showInline(){
  closeInline();
  if(!selected?.box||!rendered)return;
  const box=selected.box,sheet=$("fxieSheetWrap").querySelector(".fxie-sheet");
  if(!sheet)return;
- const editor=el("div","fxie-inline-editor");editor.setAttribute("role","group");editor.setAttribute("aria-label","Edit selected PDF text directly");
+ const editor=el("div","fxie-inline-editor");editor.setAttribute("role","group");editor.setAttribute("aria-label","Edit text and drag to reposition");
+ const grip=el("button","fxie-inline-grip","↕ Drag to move text");grip.type="button";grip.title="Move the edited text on the PDF with a finger or mouse";grip.setAttribute("aria-label","Drag edited text to another position");
  const field=el("textarea","fxie-inline-input");field.value=selected.text;field.rows=1;field.setAttribute("aria-label","Edit selected text");
- field.style.fontSize=Math.max(12,box.height)+"px";
- field.style.fontFamily=box.fontFamily||"Arial, sans-serif";
+ field.style.fontSize=Math.max(12,box.height)+"px";field.style.fontFamily=box.fontFamily||"Arial, sans-serif";
  const bar=el("div","fxie-inline-buttons");
- const apply=el("button","fxie-inline-apply","✓ Apply");apply.type="button";
+ const apply=el("button","fxie-inline-apply","✓ Apply & move");apply.type="button";
  const cancel=el("button","fxie-inline-cancel","✕ Cancel");cancel.type="button";
- bar.append(apply,cancel);editor.append(field,bar);
+ bar.append(apply,cancel);editor.append(grip,field,bar);
  const width=Math.max(195,Math.min(rendered.w-box.x-6,Math.max(box.width+70,220)));
- Object.assign(editor.style,{left:Math.max(1,Math.min(box.x-5,rendered.w-width-1))+"px",top:Math.max(2,box.top-6)+"px",width:width+"px"});
+ const left=Math.max(1,Math.min(box.x-5,rendered.w-width-1)),top=Math.max(2,box.top-6);
+ Object.assign(editor.style,{left:left+"px",top:top+"px",width:width+"px"});
+ selected.moveDelta={x:0,y:0};
  editor.addEventListener("click",e=>e.stopPropagation());
  field.addEventListener("input",()=>{$("fxieReplacement").value=field.value});
  field.addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault();closeInline()}if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();applyLocal()}});
+ let drag=null;
+ grip.addEventListener("pointerdown",e=>{
+  if(e.pointerType==="mouse"&&e.button!==0)return;
+  e.preventDefault();e.stopPropagation();
+  drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:parseFloat(editor.style.left)||0,top:parseFloat(editor.style.top)||0};
+  try{grip.setPointerCapture(e.pointerId)}catch(_){}
+  editor.classList.add("fxie-inline-dragging");
+ });
+ grip.addEventListener("pointermove",e=>{
+  if(!drag||e.pointerId!==drag.id)return;
+  e.preventDefault();e.stopPropagation();
+  const left=Math.max(0,Math.min(Math.max(0,rendered.w-editor.offsetWidth),drag.left+e.clientX-drag.x));
+  const top=Math.max(0,Math.min(Math.max(0,rendered.h-50),drag.top+e.clientY-drag.y));
+  editor.style.left=left+"px";editor.style.top=top+"px";
+  if(selected)selected.moveDelta={x:left-(Math.max(1,Math.min(box.x-5,rendered.w-width-1))),y:top-(Math.max(2,box.top-6))};
+ });
+ const finish=e=>{if(!drag||e.pointerId!==drag.id)return;drag=null;editor.classList.remove("fxie-inline-dragging");say("New position selected. Press Apply & move to save it in the PDF.")};
+ grip.addEventListener("pointerup",finish);grip.addEventListener("pointercancel",finish);
  apply.onclick=()=>applyLocal();cancel.onclick=()=>{closeInline();$("fxieReplaceBox").hidden=true;selected=null;say("Text edit canceled; your document is unchanged.")};
  sheet.append(editor);inlineEditor=editor;
  field.focus({preventScroll:true});field.setSelectionRange(field.value.length,field.value.length);
@@ -300,38 +380,112 @@ async function chooseText(text,button,pageNum,box){
 }
 $("fxieParagraph").onchange=()=>{if(selected)$("fxieReplacement").value=selected.text};
 $("fxieReplacement").oninput=()=>{const textarea=inlineEditor?.querySelector("textarea");if(textarea&&textarea.value!==$("fxieReplacement").value)textarea.value=$("fxieReplacement").value};
+
 async function applyLocal(){
  const state=selected;
  if(!state?.box)return say("Click the text you want to edit first.",true);
  const value=(inlineEditor?.querySelector("textarea")?.value??$("fxieReplacement").value).replace(/\r/g,"");
- if(value===state.text){closeInline();$("fxieReplaceBox").hidden=true;selected=null;return say("No changes made.")}
+ const delta=state.moveDelta||{x:0,y:0};
+ const moved=Math.abs(delta.x)>1||Math.abs(delta.y)>1;
+ if(value===state.text&&!moved){closeInline();$("fxieReplaceBox").hidden=true;selected=null;return say("No changes made.")}
  if(value.length>800)return say("For long text blocks, use Advanced reflow. Local editing allows 800 characters.",true);
  if(!rendered)return say("Page preview isn't ready.",true);
  if(state.page!==app.current()?.page)return say("The selected page changed. Select the text again.",true);
  const box=state.box,colors=samplePixels(box),scale=box.scale;
- const chosenFont=$("fxieFont").value,size=Number($("fxieSize").value);
+ const fontName=$("fxieFont").value,size=Number($("fxieSize").value),hex=$("fxieColor").value;
  if(!Number.isFinite(size)||size<5||size>80)return say("Choose a font size between 5 and 80.",true);
- if(!colors.uniform)say("Complex background detected: a local replacement may look imperfect. Review before sharing.",true);
- const applied=await mutate(async doc=>{
-  const pg=doc.getPage(state.page-1);
-  if(pg.getRotation().angle%360!==0)throw Error("This rotated page cannot be edited locally yet. Use Advanced reflow.");
-  const pdfSize=pg.getSize(),x=Math.max(0,box.x/scale),h=Math.max(2,box.height/scale),w=Math.max(2,box.width/scale);
-  const baseline=pdfSize.height-box.baseline/scale,coverY=Math.max(0,baseline-2.1),coverHeight=Math.min(pdfSize.height-coverY,h+5);
-  if(x+w>pdfSize.width+5||coverY+coverHeight>pdfSize.height+1)throw Error("Text region outside page; use Advanced reflow.");
-  const bg=PDFLib.rgb(...colors.background.map(v=>v/255));
-  // Appearance-only edit, not content removal or redaction. The old text may remain in streams.
-  pg.drawRectangle({x:Math.max(0,x-1.3),y:coverY,width:Math.min(w+3.5,pdfSize.width-x+1.3),height:coverHeight,color:bg});
-  if(value.trim()){
-   const font=await fxieEmbedSelectedFont(doc,chosenFont);
-   const colorValue=color(),lineHeight=size*1.16;
-   const maxWidth=Math.max(18,Math.min(pdfSize.width-x-10,Math.max(w*1.3,font.widthOfTextAtSize(state.text,size)+20)));
-   // Existing PDF embedded fonts may not be available for drawing, so use the closest supported standard font.
-   pg.drawText(value,{x,y:Math.max(0,baseline),font,size,color:colorValue,maxWidth,lineHeight});
-  }
- },colors.uniform?"Local text edit applied. Download your PDF when ready.":"Local edit applied. Check the background and nearby layout before saving.");
- if(applied){closeInline();$("fxieReplaceBox").hidden=true;selected=null;}
+ if(!colors.uniform)say("Complex background detected: a local visual edit may look imperfect. Review before sharing.",true);
+ const source=app.readCurrent();
+ if(!source)return say("Please reopen your PDF.",true);
+ const sourceX=Math.max(0,box.x/scale),sourceY=rendered.originalHeight-box.baseline/scale;
+ const x=Math.max(0,Math.min(rendered.originalWidth-6,sourceX+delta.x/scale));
+ const y=Math.max(0,Math.min(rendered.originalHeight-size*.25,sourceY-delta.y/scale));
+ const width=Math.max(18,Math.min(rendered.originalWidth-x-6,Math.max(box.width/scale*1.3,Math.max(value.length,state.text.length)*size*.6+20)));
+ const session={page:state.page,name:source.name,baseBytes:source.bytes.slice(),text:value,size,fontName,hex,
+  fontFamily:box.fontFamily||"Arial",x,y,width,
+  cover:{box:{...box},background:colors.background.slice()}};
+ const applied=await mutate(async doc=>paintMovableText(doc,session),
+  colors.uniform?"Text updated. Drag its outline to move it, then Save PDF.":"Text updated. Review the background and use the blue outline to move it.");
+ if(applied){closeInline();$("fxieReplaceBox").hidden=true;selected=null;rememberMovable(session)}
 }
 $("fxieApply").onclick=()=>applyLocal();
+
+function showMovableText(sheet){
+ sheet.querySelector(".fxie-move-frame")?.remove();
+ const session=moveSession,d=app.current();
+ if(!session||!d||!rendered||d.page!==session.page||d.name!==session.name||!session.latestBytes)return;
+ const liveBytes=currentBytes();
+ if(!equalBytes(liveBytes,session.latestBytes)){moveSession=null;return}
+ if(!session.text.trim())return;
+ const sc=rendered.scale,height=rendered.originalHeight;
+ const x=session.x*sc,top=(height-session.y-session.size*.93)*sc;
+ const width=Math.max(55,Math.min(rendered.w-x-3,Math.max(session.size*sc*2.3,Math.min(session.width*sc,Math.max(92,session.text.length*session.size*sc*.53)))));
+ const frame=el("div","fxie-move-frame");
+ frame.setAttribute("role","group");frame.setAttribute("aria-label","Move last edited text");
+ frame.title="Drag to move edited text with your mouse, finger, or stylus. The new position is saved into the PDF.";
+ frame.style.left=Math.max(0,Math.min(rendered.w-width,x))+"px";
+ frame.style.top=Math.max(0,Math.min(rendered.h-32,top))+"px";
+ frame.style.width=width+"px";
+ frame.style.minHeight=Math.max(24,session.size*sc*1.2)+"px";
+ const grip=el("button","fxie-move-label","⠿ Move text");grip.type="button";grip.title="Drag to move text";
+ const ghost=el("span","fxie-move-preview");ghost.textContent=session.text;
+ ghost.style.fontFamily=session.fontFamily||"Arial, sans-serif";
+ ghost.style.fontSize=(session.size*sc)+"px";ghost.style.color=session.hex;
+ const done=el("button","fxie-move-done","✓ Done");done.type="button";done.title="Finish moving text";
+ done.onclick=e=>{e.stopPropagation();frame.remove();say("Text position saved in the PDF. Tap Save PDF to download.")};
+ frame.append(grip,ghost,done);
+ let drag=null;
+ const start=e=>{
+  if(e.target.closest(".fxie-move-done"))return;
+  if(e.pointerType==="mouse"&&e.button!==0)return;
+  e.preventDefault();e.stopPropagation();
+  drag={id:e.pointerId,startX:e.clientX,startY:e.clientY,left:parseFloat(frame.style.left)||0,top:parseFloat(frame.style.top)||0};
+  try{frame.setPointerCapture(e.pointerId)}catch(_){}
+  frame.classList.add("fxie-moving");
+ };
+ frame.addEventListener("pointerdown",start);
+ frame.addEventListener("pointermove",e=>{
+  if(!drag||e.pointerId!==drag.id)return;
+  e.preventDefault();e.stopPropagation();
+  const x=Math.max(0,Math.min(rendered.w-frame.offsetWidth,drag.left+e.clientX-drag.startX));
+  const y=Math.max(0,Math.min(rendered.h-Math.min(frame.offsetHeight,60),drag.top+e.clientY-drag.startY));
+  frame.style.left=x+"px";frame.style.top=y+"px";
+ });
+ const stop=async(e,canceled=false)=>{
+  if(!drag||e.pointerId!==drag.id)return;
+  e.preventDefault();e.stopPropagation();
+  const prev=drag;drag=null;frame.classList.remove("fxie-moving");
+  if(canceled){frame.style.left=prev.left+"px";frame.style.top=prev.top+"px";return}
+  const dx=(parseFloat(frame.style.left)||0)-prev.left,dy=(parseFloat(frame.style.top)||0)-prev.top;
+  if(Math.abs(dx)<1&&Math.abs(dy)<1)return;
+  if(!equalBytes(currentBytes(),session.latestBytes)){frame.remove();moveSession=null;say("The PDF changed. Select the text again before moving it.",true);return}
+  const oldX=session.x,oldY=session.y;
+  session.x=Math.max(0,Math.min(rendered.originalWidth-5,session.x+dx/sc));
+  session.y=Math.max(session.size*.25,Math.min(rendered.originalHeight-session.size*.25,session.y-dy/sc));
+  frame.classList.add("fxie-move-busy");
+  const current=app.readCurrent(),previous=current?.bytes?.slice();
+  try{
+   const pdf=await PDFLib.PDFDocument.load(session.baseBytes.slice());
+   await paintMovableText(pdf,session);
+   const updated=new Uint8Array(await pdf.save({useObjectStreams:true}));
+   if(!equalBytes(currentBytes(),session.latestBytes))throw Error("PDF changed during the move");
+   if(previous?.length<8*1024*1024){undo.push(previous);if(undo.length>7)undo.shift();redo=[]}
+   session.latestBytes=updated.slice();
+   await app.replace(updated);
+   say("Text moved and PDF updated. Drag it again or choose Save PDF.");
+   requestAnimationFrame(()=>{const currentSheet=$("fxieSheetWrap").querySelector(".fxie-sheet");if(currentSheet&&rendered)showMovableText(currentSheet)});
+  }catch(err){
+   session.x=oldX;session.y=oldY;
+   frame.style.left=prev.left+"px";frame.style.top=prev.top+"px";
+   say("Could not move text: "+err.message,true);
+  }finally{frame.classList.remove("fxie-move-busy")}
+ };
+ frame.addEventListener("pointerup",e=>stop(e,false));
+ frame.addEventListener("pointercancel",e=>stop(e,true));
+ frame.addEventListener("lostpointercapture",e=>{if(drag&&e.pointerId===drag.id)stop(e,true)});
+ sheet.append(frame);
+}
+
 /* Advanced reflow stays explicit and opt-in; ordinary clicks never send PDFs to a server. */
 async function inspectRemote(){
  const d=app.current(),bytes=app.bytes(),key=d.name+":"+bytes.length+":"+d.page;
