@@ -1057,7 +1057,7 @@ async function renderThumbnails(){
 }
 
 /* Same-document dual page viewer. Selecting a thumbnail's ⇿ control opens it beside the current page. */
-let splitPane=null,splitReader=null,splitToken=0;
+let splitPane=null,splitReader=null,splitToken=0,splitEditMode='edit';
 function closeSplitView(){
  ++splitToken;splitPage=0;
  if(splitReader){try{splitReader.destroy()}catch(_){}splitReader=null}
@@ -1099,23 +1099,20 @@ async function setSplitView(pageNumber,refresh=false){
  const header=el("div","fxie-split-head");
  const title=el("strong","","Page "+n+" · right preview");
  const actions=el("div","fxie-split-controls");
- // Editing the right page uses exactly the same established editing engine as the left.
- // Swap the focused page while preserving both pages in the split layout.
- const focusRight=(nextMode)=>{
-  const left=app.current()?.page;
-  if(!left||left===splitPage){if(nextMode)setMode(nextMode);return}
-  const right=splitPage;
-  splitPage=left;
-  if(nextMode)setMode(nextMode);
-  app.setPage(right);
-  say("Editing page "+right+". Page "+left+" remains visible alongside it.");
- };
+ // Right page is a separate, fully interactive edit surface. Neither page swaps position.
  const rightTools=el("div","fxie-split-edit-actions");
- for(const [caption,tool] of [["✎ Edit","edit"],["T Text","text"],["✍ Draw","draw"],["▰ Highlight","highlight"],["▧ Image","image"]]){
+ const rightModes=[["✎ Edit","edit"],["T Text","text"],["✍ Draw","draw"],["▰ Highlight","highlight"],["▧ Image","image"]];
+ for(const [caption,tool] of rightModes){
   const button=el("button","fxie-split-edit-action",caption);
-  button.type="button";
-  button.title="Edit the right-hand page using "+caption+" tools";
-  button.addEventListener("click",()=>focusRight(tool));
+  button.type="button";button.dataset.rightTool=tool;
+  button.title="Use "+caption+" directly on the right page";
+  button.setAttribute("aria-pressed",String(splitEditMode===tool));
+  button.classList.toggle("selected",splitEditMode===tool);
+  button.addEventListener("click",()=>{
+   splitEditMode=tool;
+   rightTools.querySelectorAll("[data-right-tool]").forEach(b=>{const active=b.dataset.rightTool===tool;b.classList.toggle("selected",active);b.setAttribute("aria-pressed",String(active))});
+   say("Right page "+n+": "+tool+" is ready. Tap or drag directly on that page.");
+  });
   rightTools.append(button);
  }
 
@@ -1151,15 +1148,114 @@ async function setSplitView(pageNumber,refresh=false){
   const ctx=canvas.getContext("2d");ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
   await pg.render({canvasContext:ctx,viewport}).promise;
   if(token!==splitToken)return;
-  canvasWrap.replaceChildren(canvas);
-  canvas.title="Tap to edit this page; the other page stays visible";
-  canvas.style.cursor="pointer";
-  canvas.tabIndex=0;
-  canvas.setAttribute("role","button");
-  canvas.setAttribute("aria-label","Edit page "+n+" with all PDF editing tools");
-  canvas.addEventListener("click",()=>focusRight(mode==="select"?"edit":mode));
-  canvas.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();focusRight(mode==="select"?"edit":mode)}});
-  if(!refresh) say("Side-by-side editing is ready. Tap either page to edit it with the same tools.");
+  // Render an independent text-hit layer and drawing surface for the right PDF page.
+  const rightSheet=el("div","fxie-right-edit-sheet");
+  Object.assign(rightSheet.style,{position:"relative",width:viewport.width+"px",height:viewport.height+"px",flex:"0 0 auto"});
+  canvas.style.display="block";rightSheet.append(canvas);
+  const hitLayer=el("div","fxie-right-text-hits");
+  Object.assign(hitLayer.style,{position:"absolute",inset:"0",pointerEvents:"none"});
+  rightSheet.append(hitLayer);
+  const inkLayer=el("div","fxie-right-ink");
+  Object.assign(inkLayer.style,{position:"absolute",inset:"0",touchAction:"none",pointerEvents:"auto"});
+  rightSheet.append(inkLayer);
+  canvasWrap.replaceChildren(rightSheet);
+  const scale=metrics.scale;
+  const rightPoint=e=>{
+   const rect=rightSheet.getBoundingClientRect();
+   return {x:Math.max(0,Math.min(viewport.width,(e.clientX-rect.left)/rect.width*viewport.width)),
+    y:Math.max(0,Math.min(viewport.height,(e.clientY-rect.top)/rect.height*viewport.height))};
+  };
+  const rightMutate=async(fn,label)=>{
+   if(n>app.current()?.pages){say("This page was removed.",true);return}
+   await mutate(async pdf=>{const target=pdf.getPage(n-1);await fn(pdf,target)},label);
+  };
+  const imageInput=el("input");imageInput.type="file";imageInput.accept="image/png,image/jpeg";imageInput.hidden=true;
+  rightSheet.append(imageInput);
+  let rightImage=null;
+  imageInput.addEventListener("change",async e=>{
+   const file=e.target.files?.[0];if(!file)return;
+   if(file.size>12*1024*1024){say("Choose an image under 12 MB.",true);return}
+   rightImage={type:file.type,bytes:new Uint8Array(await file.arrayBuffer())};
+   say("Image selected. Tap where you want it on the right page.");
+  });
+  const rightTap=async e=>{
+   if(splitEditMode==="edit"){say("Tap an existing text region on the right page to edit it.");return}
+   const p=rightPoint(e);
+   if(splitEditMode==="text"){
+    const value=prompt("Text to add on right page "+n+":",($("fxieInsertText")?.value||""));
+    if(value===null||!value.trim())return;
+    const size=Number($("fxieSize")?.value)||14;
+    await rightMutate(async(pdf,pg)=>{
+     const font=await fxieEmbedSelectedFont(pdf);
+     pg.drawText(value,{x:p.x/scale,y:pg.getHeight()-p.y/scale-size,size,font,color:color(),maxWidth:Math.max(20,pg.getWidth()-p.x/scale-5),lineHeight:size*1.2});
+    },"Added text directly to right page "+n+".");
+   }else if(splitEditMode==="image"){
+    if(!rightImage){imageInput.click();return}
+    await rightMutate(async(pdf,pg)=>{
+     const img=rightImage.type==="image/png"?await pdf.embedPng(rightImage.bytes):await pdf.embedJpg(rightImage.bytes);
+     const w=Math.min(img.width,200,pg.getWidth()*.45),h=w*img.height/img.width;
+     pg.drawImage(img,{x:Math.max(0,Math.min(pg.getWidth()-w,p.x/scale)),y:Math.max(0,Math.min(pg.getHeight()-h,pg.getHeight()-p.y/scale-h)),width:w,height:h});
+    },"Added image directly to right page "+n+".");
+   }
+  };
+  let gesture=null;
+  inkLayer.addEventListener("click",e=>{if(splitEditMode==="text"||splitEditMode==="image"||splitEditMode==="edit")rightTap(e)});
+  inkLayer.addEventListener("pointerdown",e=>{
+   if(!["draw","highlight"].includes(splitEditMode))return;
+   e.preventDefault();e.stopPropagation();
+   const p=rightPoint(e);
+   gesture={id:e.pointerId,tool:splitEditMode,points:[p],start:p,preview:null};
+   inkLayer.setPointerCapture(e.pointerId);
+  });
+  inkLayer.addEventListener("pointermove",e=>{
+   if(!gesture||gesture.id!==e.pointerId)return;
+   e.preventDefault();const p=rightPoint(e);gesture.points.push(p);
+   if(!gesture.preview){gesture.preview=el("canvas","fxie-right-gesture");gesture.preview.width=Math.ceil(viewport.width*devicePixelRatio);gesture.preview.height=Math.ceil(viewport.height*devicePixelRatio);Object.assign(gesture.preview.style,{position:"absolute",inset:"0",width:"100%",height:"100%",pointerEvents:"none"});inkLayer.append(gesture.preview)}
+   const ctx=gesture.preview.getContext("2d");ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);ctx.clearRect(0,0,viewport.width,viewport.height);
+   ctx.strokeStyle=gesture.tool==="highlight"?"rgba(255,206,35,.55)":($("fxiePenColor")?.value||"#222222");
+   ctx.lineWidth=gesture.tool==="highlight"?14:Math.max(1,Number($("fxiePenWidth")?.value)||2.5)*scale;
+   ctx.lineCap="round";ctx.lineJoin="round";ctx.beginPath();
+   const pts=gesture.tool==="highlight"?[gesture.start,p]:gesture.points;
+   pts.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));ctx.stroke();
+  });
+  const finishRight=async e=>{
+   if(!gesture||gesture.id!==e.pointerId)return;
+   const g=gesture;gesture=null;g.preview?.remove();
+   if(e.type==="pointercancel"||g.points.length<2)return;
+   await rightMutate(async(pdf,pg)=>{
+    const rgb=g.tool==="highlight"?PDFLib.rgb(1,.78,.16):color();
+    const thickness=g.tool==="highlight"?12:Math.max(.75,Number($("fxiePenWidth")?.value)||2.5);
+    const pts=g.tool==="highlight"?[g.start,g.points.at(-1)]:g.points;
+    for(let i=1;i<pts.length;i++)pg.drawLine({start:{x:pts[i-1].x/scale,y:pg.getHeight()-pts[i-1].y/scale},end:{x:pts[i].x/scale,y:pg.getHeight()-pts[i].y/scale},thickness,color:rgb,opacity:g.tool==="highlight"?.38:1});
+   },"Updated "+(g.tool==="highlight"?"highlight":"drawing")+" on right page "+n+".");
+  };
+  inkLayer.addEventListener("pointerup",finishRight);inkLayer.addEventListener("pointercancel",finishRight);
+  try{
+   const textContent=await pg.getTextContent();
+   if(token!==splitToken)return;
+   for(const item of textContent.items){
+    if(!item.str?.trim())continue;
+    const mat=lib.Util.transform(viewport.transform,item.transform);
+    const size=Math.max(8,Math.hypot(mat[2],mat[3]));
+    const button=el("button","fxie-textregion");
+    button.type="button";button.textContent="";button.title="Edit: "+item.str.slice(0,100);
+    Object.assign(button.style,{position:"absolute",left:mat[4]+"px",top:(mat[5]-size)+"px",width:Math.max(9,Math.abs(item.width)*scale)+"px",height:size+"px",pointerEvents:"auto"});
+    button.addEventListener("click",async e=>{
+     if(splitEditMode!=="edit")return;
+     e.preventDefault();e.stopPropagation();
+     const replacement=prompt("Edit text on right page "+n+":",item.str);
+     if(replacement===null||replacement===item.str)return;
+     await rightMutate(async(pdf,pg)=>{
+      const font=await fxieEmbedSelectedFont(pdf),sz=Math.max(6,size/scale);
+      const px=mat[4]/scale,py=pg.getHeight()-mat[5]/scale;
+      pg.drawRectangle({x:Math.max(0,px-1),y:Math.max(0,py-2),width:Math.min(pg.getWidth()-px,Math.max(item.width/1,sz*.8)+4),height:sz+5,color:PDFLib.rgb(1,1,1)});
+      if(replacement.trim())pg.drawText(replacement,{x:px,y:py,size:sz,font,color:color(),maxWidth:Math.max(10,pg.getWidth()-px-4)});
+     },"Edited right-page text. Review the PDF before saving.");
+    });
+    hitLayer.append(button);
+   }
+  }catch(err){console.warn("Right page text layer unavailable",err)}
+  if(!refresh) say("Both pages are editable in place. The right page has its own text, drawing, highlight, and image tools.");
  }catch(err){if(token===splitToken)canvasWrap.replaceChildren(el("p","fxie-split-message","Unable to open right preview: "+err.message))}
 }
 
