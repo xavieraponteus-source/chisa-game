@@ -1,5 +1,26 @@
 
 (()=>{"use strict";
+
+/* FOX_ADMIN_CLIENT_SHELL — all panels rendered client-side from trusted static markup. */
+const nav=[["overview","◈","Overview"],["visitors","♧","Visitors"],["pages","▤","Pages"],["countries","◎","Countries"],["devices","▣","Devices"],["sources","⌁","Sources"],["activity","↗","Activity"],["messages","✉","Messages"],["system","⚙","System"]];
+const foxArt="https://raw.githubusercontent.com/xavieraponteus-source/chisa-game/main/assets/foxpdf/golden-fox-fixed-v10.webp";
+const table=(id,headers)=>'<div class="tablewrap"><table><thead><tr>'+headers.map(t=>'<th>'+t+'</th>').join("")+'</tr></thead><tbody id="'+id+'"></tbody></table></div>';
+const panel=(name,content)=>'<section class="panel"><h3>'+name+'</h3>'+content+'</section>';
+const cards=(defs)=>'<div class="metrics">'+defs.map(([id,title,sub])=>'<div class="metric"><small>'+title+'</small><strong id="'+id+'">—</strong><span>'+(sub||"")+'</span></div>').join("")+'</div>';
+const page=(name,content,active)=>'<section data-page="'+name+'" class="page '+(active?"active":"")+'">'+content+'</section>';
+const hero='<div class="hero"><span class="decor">✦ 🌸</span><h2>Moonlight Control Center</h2><p>Everything across Xavier is Working: Chisa Moonlight Flight!, FoxPDF Studio, visitor trends, countries and support requests—in one private dashboard.</p></div>';
+document.body.innerHTML='<div class="shell"><aside class="sidebar" id="sidebar"><a class="brand" href="/"><span class="brand-icon">🦊</span><span><b>Xavier is Working</b><small>ADMIN CONTROL CENTER</small></span></a><nav class="nav" aria-label="Admin navigation">'+nav.map(([id,ico,label],i)=>'<button type="button" data-nav="'+id+'" class="'+(i===0?"active":"")+'"><span class="ico">'+ico+'</span>'+label+'</button>').join("")+'</nav><div class="sidebar-art"><img src="'+foxArt+'" alt="Fox mascot artwork"><p>✦ Moonlight Administration</p></div><div class="side-bottom"><a href="/">Public site</a><a href="/admin/logout">Sign out</a></div></aside><main class="main"><div class="head"><div><button type="button" id="mobileMenu">☰ Menu</button><h1>Full-Site Analytics</h1><p>Home · Chisa Moonlight Flight! · FoxPDF Studio</p></div><div class="actions"><span class="chip"><span class="pulse"></span>Private Admin</span><button id="refresh" class="chip" type="button">↻ Refresh</button><button id="export" class="chip gold" type="button">⇩ Export CSV</button></div></div><div class="toolbar"><div class="seg"><button data-days="7">7 days</button><button data-days="30" class="active">30 days</button><button data-days="90">90 days</button></div><span id="lastRefreshed" class="note">Loading…</span></div><div id="dataNotice" class="banner hidden"></div><p id="refreshError" class="error"></p>'+
+page("overview",hero+cards([["metricViews","Total page views","Across tracked sections"],["metricSessions","Anonymous sessions","Not named people"],["metricGame","Chisa game visits","Existing game records"],["metricPdf","FoxPDF visits","Editor views"]])+'<div class="dashgrid">'+panel("Visitor trend",'<div class="chart" id="trafficChart"></div>')+panel("Visitors by country",'<div class="bars" id="countryBars"></div>')+panel("Top pages",'<div class="bars" id="pageBars"></div>')+panel("Devices",'<div class="bars" id="deviceBars"></div>')+panel("Traffic sources",'<div class="bars" id="sourceBars"></div>')+panel("Website sections",'<div class="bars" id="sectionBars"></div>')+'</div>',true)+
+page("visitors",panel("Recent anonymous visits",table("visitorsTable",["When","Section","Page","Country","Device","Event"])),false)+
+page("pages",panel("Most visited pages",table("pagesTable",["#","Page","Views"])),false)+
+page("countries",panel("Visitor locations (when available)",table("countriesTable",["#","Country","Visits"]))+'<p class="note">Unknown means a trusted country signal was not available; this is not GPS tracking.</p>',false)+
+page("devices",panel("Mobile, tablet and desktop",table("devicesTable",["#","Device","Visits"])),false)+
+page("sources",panel("Traffic sources",table("sourcesTable",["#","Source","Visits"])),false)+
+page("activity",panel("Recent actions",table("eventsTable",["When","Section","Action","Page"])),false)+
+page("messages",hero+panel('Feedback and support · <span id="messageCount">—</span>',table("messagesTable",["Date","From","Name","Message","Status","Reply"])),false)+
+page("system",cards([["metricHub","Home visits","App selection"],["metricTools","PDF tool clicks","Editor events"],["metricCountries","Countries","Known location"],["metricSupport","Support messages","Existing inbox"]])+panel("Tracking coverage",'<p id="coverageText" class="note">Checking Chisa visits table…</p><p class="note">No PDF contents, IP addresses or document filenames are stored by the analytics feature.</p>')+panel("Visits by section",table("sectionsTable",["#","Section","Events"])),false)+
+'<footer class="footer"><span>Xavier is Working · Private Admin</span><span>Entire website · Chisa · FoxPDF</span></footer></main></div>';
+
 const $=id=>document.getElementById(id),$$=sel=>Array.from(document.querySelectorAll(sel));
 const h=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const num=n=>Number(n||0).toLocaleString(),date=x=>x?new Date(x).toLocaleString("en-US",{dateStyle:"medium",timeStyle:"short"}):"—";
