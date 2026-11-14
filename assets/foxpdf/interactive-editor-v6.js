@@ -580,7 +580,7 @@ function showInline(){
 }
 async function chooseText(text,button,pageNum,box){
  closeInline();view.querySelectorAll(".fxie-textregion").forEach(a=>a.classList.remove("selected"));button.classList.add("selected");
- selected={text,page:pageNum,box,button,revision:++localRevision};
+ selected={text,page:pageNum,box,button,revision:++localRevision,source:app.readCurrent()};
  $("fxieReplaceBox").hidden=false;$("fxieInsertBox").hidden=true;
  $("fxieParagraph").replaceChildren(new Option("Selected text segment · local editing","local"));
  $("fxieReplacement").value=text;
@@ -609,6 +609,7 @@ async function applyLocal(){
  if(!colors.uniform)say("Complex background detected: a local visual edit may look imperfect. Review before sharing.",true);
  const source=app.readCurrent();
  if(!source)return say("Please reopen your PDF.",true);
+ if(!state.source||source.name!==state.source.name||!equalBytes(source.bytes,state.source.bytes))return say("The PDF changed. Select the text again before editing.",true);
  const sourceX=Math.max(0,box.x/scale),sourceY=rendered.originalHeight-box.baseline/scale;
  const x=Math.max(0,Math.min(rendered.originalWidth-6,sourceX+delta.x/scale));
  const y=Math.max(0,Math.min(rendered.originalHeight-size*.25,sourceY-delta.y/scale));
@@ -616,7 +617,11 @@ async function applyLocal(){
  const session={page:state.page,name:source.name,baseBytes:source.bytes.slice(),text:value,size,fontName,hex,
   fontFamily:box.fontFamily||"Arial",x,y,width,
   cover:{box:{...box},background:colors.background.slice()}};
- const applied=await mutate(async doc=>paintMovableText(doc,session),
+ const applied=await mutate(async doc=>{
+  const live=app.readCurrent();
+  if(!live||live.name!==source.name||!equalBytes(live.bytes,source.bytes))throw Error("The PDF changed before editing. Select the text again.");
+  await paintMovableText(doc,session);
+ },
   colors.uniform?"Text updated. Drag its outline to move it, then Save PDF.":"Text updated. Review the background and use the blue outline to move it.");
  if(applied){closeInline();$("fxieReplaceBox").hidden=true;selected=null;rememberMovable(session)}
 }
@@ -847,38 +852,55 @@ function showMovableInk(sheet,pageOverride,scaleOverride,dimensions){
 }
 
 /* Advanced reflow stays explicit and opt-in; ordinary clicks never send PDFs to a server. */
-async function inspectRemote(){
- const d=app.current(),bytes=app.bytes(),key=d.name+":"+bytes.length+":"+d.page;
- if(inspectCache?.key===key)return inspectCache.value;
+async function inspectRemote(source){
+ const d=source||app.readCurrent();if(!d)throw Error("Open a PDF first");
+ const bytes=d.bytes;
+ if(inspectCache?.name===d.name&&equalBytes(inspectCache.bytes,bytes))return inspectCache.value;
  const data=new FormData();data.append("file",new File([bytes],d.name,{type:"application/pdf"}));
  const response=await fetch("/api/advanced/inspect",{method:"POST",body:data,credentials:"omit"});
  if(!response.ok){let m="Inspection failed";try{m=(await response.json()).detail||m}catch{}throw Error(m)}
- const value=await response.json();inspectCache={key,value};return value;
+ const value=await response.json();inspectCache={name:d.name,bytes:bytes.slice(),value};return value;
 }
-$("fxieCloudReflow").onclick=async()=>{
+function reflowParagraph(paragraphs,text){
+ const ranked=paragraphs.map(item=>({item,match:score(text,item.text||item.preview)})).sort((a,b)=>b.match-a.match);
+ if(!ranked.length||ranked[0].match<85)throw Error("The original paragraph could not be matched safely. Select a complete text region.");
+ if(ranked.length>1&&ranked[0].match===ranked[1].match)throw Error("Several paragraphs match this text. Advanced reflow cannot safely choose one.");
+ const chosen=ranked[0].item;
+ if(chosen.mixed_styles)throw Error("Mixed-font paragraph cannot safely reflow");
+ return chosen;
+}
+async function applyRemoteReflow(){
  if(!selected)return say("Select the paragraph you want to edit first.",true);
  const text=$("fxieReplacement").value.trim();
  if(!text)return say("Enter the replacement text.",true);
  // Clicking Advanced reflow initiates the requested server edit directly; disclosure remains visible in the editor.
  const state=selected;closeInline();
- try{
+ const textSource=state.source;
+ const job=async()=>{try{
+  const current=app.readCurrent();
+  if(!current||!textSource||current.name!==textSource.name||!equalBytes(current.bytes,textSource.bytes))throw Error("The PDF changed. Select the paragraph again.");
   say("Finding the original paragraph for advanced reflow…");
-  const data=await inspectRemote(),all=(data.pages||[]).find(p=>Number(p.page)===state.page)?.paragraphs||[];
+  const data=await inspectRemote(current),all=(data.pages||[]).find(p=>Number(p.page)===state.page)?.paragraphs||[];
   if(!all.length)throw Error("No safely editable paragraphs found on this page");
-  const ranked=all.slice().sort((a,b)=>score(state.text,b.text||b.preview)-score(state.text,a.text||a.preview));
-  const chosen=ranked[0];
-  if(chosen.mixed_styles)throw Error("Mixed-font paragraph cannot safely reflow");
-  const current=app.readCurrent(),form=new FormData();
+  const chosen=reflowParagraph(all,state.text),form=new FormData();
   form.append("file",new File([current.bytes],current.name,{type:"application/pdf"}));
   form.append("operation","reflow");
   form.append("params",JSON.stringify({page:state.page,index:chosen.index,text,preserve_font:true}));
   const response=await fetch("/api/advanced/process",{method:"POST",body:form,credentials:"omit"});
   if(!response.ok){let err="Reflow rejected";try{err=(await response.json()).detail||err}catch{}throw Error(err)}
   const bytes=new Uint8Array(await response.arrayBuffer());
-  if(current.bytes.length<8*1024*1024){undo.push(current.bytes);if(undo.length>7)undo.shift();redo=[]}
-  await app.replace(bytes);selected=null;inspectCache=null;$("fxieReplaceBox").hidden=true;
+  const output=await PDFLib.PDFDocument.load(bytes.slice());
+  if(output.getPageCount()!==current.count)throw Error("The processed PDF has a different page count");
+  const live=app.readCurrent();
+  if(!live||live.name!==current.name||!equalBytes(live.bytes,current.bytes))throw Error("The PDF changed during processing. Your newer edits were kept; select the paragraph again.");
+  await app.replace(bytes);fxieRememberUndo(current.bytes);selected=null;inspectCache=null;$("fxieReplaceBox").hidden=true;
   say("Advanced paragraph reflow completed. Check the PDF layout and save.");
- }catch(e){say("Advanced reflow could not finish: "+e.message,true)}
+ }catch(e){say("Advanced reflow could not finish: "+e.message,true);return false}};
+ const run=fxieMutationChain.then(job,job);fxieMutationChain=run.then(()=>{},()=>{});return run;
+}
+$("fxieCloudReflow").onclick=async()=>{
+ const button=$("fxieCloudReflow");if(button.disabled)return;
+ button.disabled=true;try{await applyRemoteReflow()}finally{button.disabled=false}
 };
 
 for(const b of view.querySelectorAll("[data-mode]"))b.onclick=()=>setMode(b.dataset.mode);
@@ -1737,4 +1759,3 @@ window.FoxPDFInteractiveEditor={
 if(app.current()){$("fxieFilename").textContent=app.current().name}
 });
 })();
-
