@@ -22,6 +22,9 @@ view.innerHTML=[
 '<input id="fxieImageFile" type="file" accept="image/png,image/jpeg" hidden>'
 ].join("");
 main.append(view);
+const fxieSplitEditStyle=document.createElement("style");
+fxieSplitEditStyle.textContent=`.fxie-split-head{flex-wrap:wrap}.fxie-split-edit-actions{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;width:100%;order:3}.fxie-split-edit-action{border:1px solid #a58d46;border-radius:7px;background:#24202b;color:#f8e4ad;padding:6px 8px;font-size:12px;min-height:34px;touch-action:manipulation}.fxie-split-edit-action:focus-visible,.fxie-split-edit-action:hover{outline:2px solid #c7a94b}.fxie-split-canvas:focus-visible{outline:3px solid #e7c56e;outline-offset:3px}@media(max-width:700px){.fxie-split-edit-action{min-height:42px;padding:9px}}`;
+document.head.append(fxieSplitEditStyle);
 let mode="select",zoom="fit",renderVersion=0,rendered=null,selected=null,inspectCache=null,consentKey="",undo=[],redo=[],historyName="",pendingImage=null,drawing=null,lastPdf=null,inkStroke=null;
 let moveSession=null,dragTextHandle=null; // Last locally applied text remains repositionable.
 let inkSession=null; // Most recently drawn stroke, movable and resizable.
@@ -1096,6 +1099,26 @@ async function setSplitView(pageNumber,refresh=false){
  const header=el("div","fxie-split-head");
  const title=el("strong","","Page "+n+" · right preview");
  const actions=el("div","fxie-split-controls");
+ // Editing the right page uses exactly the same established editing engine as the left.
+ // Swap the focused page while preserving both pages in the split layout.
+ const focusRight=(nextMode)=>{
+  const left=app.current()?.page;
+  if(!left||left===splitPage){if(nextMode)setMode(nextMode);return}
+  const right=splitPage;
+  splitPage=left;
+  if(nextMode)setMode(nextMode);
+  app.setPage(right);
+  say("Editing page "+right+". Page "+left+" remains visible alongside it.");
+ };
+ const rightTools=el("div","fxie-split-edit-actions");
+ for(const [caption,tool] of [["✎ Edit","edit"],["T Text","text"],["✍ Draw","draw"],["▰ Highlight","highlight"],["▧ Image","image"]]){
+  const button=el("button","fxie-split-edit-action",caption);
+  button.type="button";
+  button.title="Edit the right-hand page using "+caption+" tools";
+  button.addEventListener("click",()=>focusRight(tool));
+  rightTools.append(button);
+ }
+
  const step=(symbol,next,label)=>{
   const b=el("button","",symbol);b.type="button";b.title=label;b.setAttribute("aria-label",label);
   b.onclick=()=>setSplitView(Math.max(1,Math.min(app.current().pages,next())),true);
@@ -1109,7 +1132,7 @@ async function setSplitView(pageNumber,refresh=false){
  actions.append(input);
  step("›",()=>splitPage+1,"Next page in right preview");
  const close=el("button","fxie-split-close","✕");close.type="button";close.title="Close side-by-side view";close.setAttribute("aria-label","Close right page preview");close.onclick=closeSplitView;
- actions.append(close);header.append(title,actions);
+ actions.append(close);header.append(title,rightTools,actions);
  const canvasWrap=el("div","fxie-split-content"),placeholder=el("p","fxie-split-message","Rendering page "+n+"…");
  canvasWrap.append(placeholder);splitPane.append(header,canvasWrap);
  try{
@@ -1129,7 +1152,14 @@ async function setSplitView(pageNumber,refresh=false){
   await pg.render({canvasContext:ctx,viewport}).promise;
   if(token!==splitToken)return;
   canvasWrap.replaceChildren(canvas);
-  if(!refresh) say("Equal-size page previews are open. Drag a thumbnail to the right preview to compare another page.");
+  canvas.title="Tap to edit this page; the other page stays visible";
+  canvas.style.cursor="pointer";
+  canvas.tabIndex=0;
+  canvas.setAttribute("role","button");
+  canvas.setAttribute("aria-label","Edit page "+n+" with all PDF editing tools");
+  canvas.addEventListener("click",()=>focusRight(mode==="select"?"edit":mode));
+  canvas.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();focusRight(mode==="select"?"edit":mode)}});
+  if(!refresh) say("Side-by-side editing is ready. Tap either page to edit it with the same tools.");
  }catch(err){if(token===splitToken)canvasWrap.replaceChildren(el("p","fxie-split-message","Unable to open right preview: "+err.message))}
 }
 
