@@ -865,6 +865,12 @@ const findBox=el("aside","fxie-search-panel");
 findBox.hidden=true;
 findBox.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between"><strong>Find & Replace</strong><button type="button" id="fxFindClose">✕</button></div><label>Search word or phrase<input id="fxFindWord" type="text" autocomplete="off" placeholder="Enter any word"></label><label>Replace with<input id="fxFindWith" type="text" placeholder="Replacement text"></label><label><input id="fxFindWhole" type="checkbox" checked> Whole word only</label><label><input id="fxFindCase" type="checkbox"> Match case</label><div class="fxie-search-actions"><button id="fxFindRun">Find all</button><button id="fxFindPrevious">‹ Previous</button><button id="fxFindNext">Next ›</button></div><div id="fxFindCount" role="status" aria-live="polite">Enter a word to search.</div><div class="fxie-search-actions"><button id="fxFindOne">Replace this</button><button id="fxFindAll">Replace all</button></div><div id="fxFindList" class="fxie-search-pages"></div><p class="fxie-search-note">Search works on selectable text in your PDF. Image-only pages require OCR first. This local replacement visually covers matched text and adds new text; original content may still exist in the PDF. It is not redaction. Formatting may change.</p>';
 view.querySelector(".fxie-stage").append(findBox);
+const findTop=el("button","fxie-find-open","⌕ Find / Replace");
+findTop.type="button";findTop.title="Find every matching word, replace one or all";
+findTop.style.cssText="min-height:36px;padding:6px 10px;border:1px solid #a99158;border-radius:7px;background:#313039;color:#f5d993;white-space:nowrap";
+view.querySelector(".fxie-barleft")?.append(findTop);
+findTop.addEventListener("click",()=>$("fxieSearch")?.click());
+
 const findEl=id=>document.getElementById(id);
 const wordCharacter=c=>!!c&&/[\p{L}\p{N}_]/u.test(c);
 function findOccurrences(value,query,whole,caseSensitive){
