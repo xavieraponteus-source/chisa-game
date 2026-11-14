@@ -95,8 +95,35 @@ try{
  say("Page "+d.page+" · "+count+" selectable text regions");
 }catch(e){$("fxieSheetWrap").replaceChildren(el("p","fxie-error","Unable to show page: "+e.message));say("PDF rendering failed: "+e.message,true)}
 }
-async function mutate(fn,description){const original=app.readCurrent();if(!original)return;if(!window.PDFLib)return say("Editing engine is unavailable.",true);
-try{const pdf=await PDFLib.PDFDocument.load(original.bytes.slice(0));await fn(pdf);const result=new Uint8Array(await pdf.save({useObjectStreams:true}));if(original.bytes.length<8*1024*1024){undo.push(original.bytes);if(undo.length>7)undo.shift();redo=[]}await app.replace(result);say(description);return true}catch(e){say("Edit failed: "+e.message,true);return false}}
+/* Serialize all local edits across both panes so rapid pen strokes, text and images
+   cannot overwrite one another's PDF bytes. Keep a bounded, unified undo history. */
+let fxieMutationChain=Promise.resolve(),fxieHistoryBytes=0;
+function fxieRememberUndo(bytes){
+ const snap=bytes.slice();undo.push(snap);fxieHistoryBytes+=snap.byteLength;redo=[];
+ while(undo.length>12||fxieHistoryBytes>48*1024*1024){
+  const removed=undo.shift();if(removed)fxieHistoryBytes-=removed.byteLength;
+ }
+}
+async function mutate(fn,description){
+ const job=async()=>{
+  const original=app.readCurrent();if(!original)return false;
+  if(!window.PDFLib){say("Editing engine is unavailable.",true);return false}
+  try{
+   const pdf=await PDFLib.PDFDocument.load(original.bytes.slice());
+   await fn(pdf);
+   const result=new Uint8Array(await pdf.save({useObjectStreams:true}));
+   const live=app.readCurrent();
+   if(!live||live.name!==original.name){say("Document changed during editing. Your original file is safe.",true);return false}
+   fxieRememberUndo(original.bytes);
+   await app.replace(result);
+   say(description);
+   return true;
+  }catch(err){say("Edit failed: "+String(err?.message||err),true);return false}
+ };
+ const run=fxieMutationChain.then(job,job);
+ fxieMutationChain=run.then(()=>{},()=>{});
+ return run;
+}
 
 const fxieFontBytes = new Map();
 let fxieFontKitPromise = null;
@@ -1287,10 +1314,10 @@ $("fxieZoom").onchange=e=>{zoom=e.target.value;draw()};
 function currentZoom(){return zoom==="fit"?(rendered?.scale||1):Number(zoom)}
 function scaleBy(v){const factor=Math.max(.5,Math.min(2.5,currentZoom()*v));zoom=String(Math.round(factor*100)/100);const z=$("fxieZoom");if(![...z.options].some(o=>o.value===zoom))z.add(new Option(Math.round(factor*100)+"%",zoom));z.value=zoom;draw()}
 bind("fxieMinus",()=>scaleBy(.8));bind("fxiePlus",()=>scaleBy(1.25));
-bind("fxieUndo",async()=>{if(!undo.length)return say("Nothing to undo.");const d=app.readCurrent();redo.push(d.bytes);await app.replace(undo.pop());say("Last change undone.")});
-bind("fxieRedo",async()=>{if(!redo.length)return say("Nothing to redo.");const d=app.readCurrent();undo.push(d.bytes);await app.replace(redo.pop());say("Change restored.")});
+bind("fxieUndo",async()=>{await fxieMutationChain;if(!undo.length)return say("Nothing to undo.");const d=app.readCurrent();redo.push(d.bytes.slice());const previous=undo.pop();fxieHistoryBytes-=previous.byteLength;await app.replace(previous);say("Last change undone.")});
+bind("fxieRedo",async()=>{await fxieMutationChain;if(!redo.length)return say("Nothing to redo.");const d=app.readCurrent();fxieRememberUndo(d.bytes);await app.replace(redo.pop());say("Change restored.")});
 bind("fxieInfo",()=>alert("The FoxPDF editor renders pages and selectable text blocks. Original paragraph editing uses guarded server processing and may reject font-complex layouts. Permanent redaction is a separate, secure operation."));
-window.addEventListener("foxpdf:change",()=>{const d=app.current();if(d){$("fxieFilename").textContent=d.name;$("fxieCount").textContent=d.page+" / "+d.pages;if(historyName!==d.name){undo=[];redo=[];historyName=d.name}}if(!mini.hidden&&d){
+window.addEventListener("foxpdf:change",()=>{const d=app.current();if(d){$("fxieFilename").textContent=d.name;$("fxieCount").textContent=d.page+" / "+d.pages;if(historyName!==d.name){undo=[];redo=[];fxieHistoryBytes=0;historyName=d.name}}if(!mini.hidden&&d){
  if(d.bytes!==thumbRenderedSource){
   clearTimeout(thumbRefreshTimer);
   thumbRefreshTimer=setTimeout(()=>renderThumbnails().catch(e=>say("Could not update page organizer: "+e.message,true)),110);
