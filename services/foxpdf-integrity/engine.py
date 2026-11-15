@@ -42,6 +42,7 @@ def runs(page):
                     yield f"{bi}:{li}:{si}", span, line
 
 def inspect_pdf(data):
+    from layout import inspect_paragraphs
     with open_pdf(data) as doc:
         pages = []
         for number, page in enumerate(doc):
@@ -53,7 +54,7 @@ def inspect_pdf(data):
                               "size": span["size"], "color": span["color"], "bbox": list(span["bbox"]),
                               "rotation": round(angle, 2), "editable": abs(angle / 90 - round(angle / 90)) < .001})
             pages.append({"page": number + 1, "width": page.rect.width, "height": page.rect.height,
-                          "rotation": page.rotation, "runs": items})
+                          "rotation": page.rotation, "runs": items,"paragraphs":inspect_paragraphs(page)})
         return {"source_sha256": sha(data), "pages": pages, "page_count": len(doc),
                 "signed": any(p.get_sigflags() > 0 for p in [doc])}
 

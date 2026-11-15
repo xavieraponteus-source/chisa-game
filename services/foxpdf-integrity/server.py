@@ -2,13 +2,14 @@ import os, hmac, json, threading
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import Response
 from engine import EngineError, inspect_pdf, edit_run, redact_image_copy, MAX_BYTES
+from layout import edit_paragraph
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 lock = threading.Lock()
 
 @app.get("/health")
 def health():
-    return {"ok":True,"engine":"FoxPDF Integrity","version":"1.0","stateless":True}
+    return {"ok":True,"engine":"FoxPDF Integrity","version":"1.1","stateless":True}
 
 def authorize(token):
     expected = os.environ.get("FOXPDF_API_TOKEN", "")
@@ -46,6 +47,7 @@ def process(file: UploadFile = File(...), operation: str = Form(...), params: st
         if not isinstance(options, dict): raise EngineError("Invalid operation parameters")
         data = uploaded(file)
         if operation == "edit_run": output, report = edit_run(data, options)
+        elif operation == "edit_paragraph": output, report = edit_paragraph(data, options)
         elif operation == "redact_image_copy": output, report = redact_image_copy(data, options)
         else: raise EngineError("Unsupported operation")
         return Response(output, media_type="application/pdf", headers={
