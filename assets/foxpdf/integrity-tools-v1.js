@@ -2,15 +2,16 @@
 (function(){"use strict";
 const ready=fn=>document.readyState==="loading"?document.addEventListener("DOMContentLoaded",fn,{once:true}):fn();
 ready(()=>{
-if(window.FoxPDFIntegrity?.version==="2.1")return;
+if(window.FoxPDFIntegrity?.version==="2.2")return;
 const app=window.FoxPDFBridge;if(!app)return;
 const make=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};
 const css=document.createElement("link");css.rel="stylesheet";css.href="/fox-assets/integrity-tools-v1.css?v=1.7";document.head.append(css);
-let liveEdit=null;
+let liveEdit=null,interactionVersion=0;
 let modal=null,lastFocus=null,keyTrap=null,fabState=null,clearHandle=null,layoutCache=null;
 const same=(a,b)=>!!a&&!!b&&a.name===b.name&&a.bytes.length===b.bytes.length&&a.bytes.every((v,i)=>v===b.bytes[i]);
-async function finishLive(){if(liveEdit){await liveEdit.flush();liveEdit?.cleanup()}}
-function requestClose(){finishLive().then(close).catch(e=>app.say(e.message))}
+async function finishLive(){const editing=liveEdit;if(editing){await editing.flush();if(liveEdit===editing)editing.cleanup()}}
+async function selectText(selection){const intent=++interactionVersion;try{await finishLive();if(intent===interactionVersion)paragraph(selection)}catch(e){app.say(e.message)}}
+function requestClose(){const intent=++interactionVersion;finishLive().then(()=>{if(intent===interactionVersion)close()}).catch(e=>app.say(e.message))}
 function close(){clearHandle?.();if(keyTrap)document.removeEventListener("keydown",keyTrap,true);keyTrap=null;const fab=document.getElementById("chatFab");if(fabState&&fab){if(fabState.value)fab.style.setProperty("display",fabState.value,fabState.priority);else fab.style.removeProperty("display")}fabState=null,clearHandle=null;modal?.parentElement?.classList.remove("fxi-docked");modal?.remove();modal=null;lastFocus?.focus?.();window.dispatchEvent(new Event("resize"))}
 function button(text,action,primary=false){const e=make("button",text,primary?"fxi-primary":"");e.type="button";e.onclick=async event=>{try{if(liveEdit&&!e.closest(".fxi-live-toolbar")&&!e.closest(".fxi-body"))await finishLive();await action(event)}catch(err){app.say(err.message)}};return e}
 function field(label,control){const e=make("label");e.append(make("span",label),control);return e}
@@ -137,7 +138,7 @@ function liveWriter({snapshot,process,commit,status,delay=350}){
 function paragraph(selection=null){
  const source=app.readCurrent();if(!source){app.open();return app.say("Open a PDF, then choose Paragraph edit.")}
  const ui=dialog("Edit text live");disclosure(ui.body);
- ui.body.append(make("p","Type on the PDF or here. The preview updates immediately; verified PDF changes save after you pause. Use the size buttons and drag handle to arrange your text. Done finishes the edit.","fxi-note"));
+ ui.body.append(make("p","Type on the PDF or here. The preview updates immediately; verified PDF changes save after you pause. Use the size buttons and drag handle to arrange your text. Click outside to finish, or click another paragraph to edit it.","fxi-note"));
  const inspect=button("Start editing text",async()=>{inspect.disabled=true;ui.status.textContent="Preparing editable text…";try{
   const info=await inspectLayout(source);if(modal!==ui.root)return;
   if(!same(source,app.readCurrent()))throw Error("The document changed. Select the text again.");
@@ -316,15 +317,27 @@ function compare(){
  }catch(e){ui.status.textContent=e.message}finally{run.disabled=false}},true);
  ui.body.append(field("Compare current PDF with",choice),file,run,results);
 }
-let replayDownload=false;
+let replayOutside=false,pointerStartedInside=false;
+const liveSurface=".fxi-panel,.fxi-live-text,.fxi-live-toolbar";
+document.addEventListener("pointerdown",event=>{pointerStartedInside=!!event.target.closest?.(liveSurface)},true);
 document.addEventListener("click",async event=>{
- const target=event.target.closest?.("#fxieSave,#download,#fxiePrint,#fxieShare,#fxieUndo,#fxieRedo,.fxie-topbar button,.fxie-editorbar button,.fxie-left button");
- if(!target||!liveEdit||replayDownload)return;
+ if(replayOutside||event.target.closest?.(liveSurface))return;
+ const editing=liveEdit,opening=modal?.querySelector('[aria-label="Edit text live"]');
+ if(!editing&&!opening)return;
+ // A text-selection drag that ends outside the field is not an outside click.
+ if(event.detail>0&&pointerStartedInside)return;
+ const action=event.target.closest?.("button,a,input,select,label"),intent=++interactionVersion;
  event.preventDefault();event.stopImmediatePropagation();
- try{if(["fxieSave","download","fxiePrint","fxieShare"].includes(target.id))await liveEdit.flush();else await finishLive();replayDownload=true;target.click()}catch(e){app.say("Finish saving your text first: "+e.message)}finally{replayDownload=false}
+ try{
+  await finishLive();if(intent!==interactionVersion)return;
+  close();
+  // Keep the original text button's listener: a save may replace its page DOM.
+  // Its captured text/page coordinates still identify the clicked paragraph.
+  if(action){replayOutside=true;try{action.click()}finally{replayOutside=false}}
+ }catch(e){app.say("Your text is still open because it could not be saved: "+e.message)}
 },true);
 window.addEventListener("beforeunload",event=>{if(liveEdit?.writer.dirty){event.preventDefault();event.returnValue=""}});
-window.FoxPDFIntegrity={version:"2.1",open:async type=>{try{await finishLive();return type==="compare"?compare():type==="search"?search():type==="move"?moveText():type==="redact"?redact():type==="paragraph"?paragraph():["ocr","compress","convert","protect"].includes(type)?processing(type==="protect"?"encrypt":type):edit()}catch(e){app.say(e.message)}},editSelection:async selection=>{try{await finishLive();paragraph(selection)}catch(e){app.say(e.message)}},sameSource:same};
+window.FoxPDFIntegrity={version:"2.2",open:async type=>{try{await finishLive();return type==="compare"?compare():type==="search"?search():type==="move"?moveText():type==="redact"?redact():type==="paragraph"?paragraph():["ocr","compress","convert","protect"].includes(type)?processing(type==="protect"?"encrypt":type):edit()}catch(e){app.say(e.message)}},editSelection:selectText,sameSource:same};
 const bar=document.querySelector(".fxie-barleft");if(bar){bar.append(button("Paragraph edit",paragraph),button("Precise text",edit),button("Redact & sanitize",redact),button("PDF tools",()=>processing("ocr")))}
 const convert=document.getElementById("fxieConvert");if(convert)convert.onclick=()=>processing("convert");
 const advanced=document.getElementById("fxieAdvanced");if(advanced)advanced.onclick=()=>processing("ocr");

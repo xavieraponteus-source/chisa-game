@@ -18,7 +18,7 @@ test('page typing, size buttons, drag, and immediate Save use the latest draft',
  const grip=page.getByRole('button',{name:'Drag paragraph to move it'}),box=await grip.boundingBox();await page.mouse.move(box.x+10,box.y+10);await page.mouse.down();await page.mouse.move(box.x+30,box.y+40);await page.mouse.up();
  await page.getByRole('button',{name:'Save PDF',exact:true}).click();await page.waitForFunction(()=>window.downloads.length===1);
  const result=await page.evaluate(()=>({writes:window.writes,download:window.downloads[0],preview:document.querySelector('.fxi-live-text')?.textContent}));
- assert.equal(result.download.text,'Live edit');assert.equal(result.download.font_scale,1.1);assert.deepEqual(result.download.position,{x:60,y:90});assert.equal(result.preview,'Live edit');
- await page.getByRole('button',{name:'Done editing',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.fxi-live-text'));
+ assert.equal(result.download.text,'Live edit');assert.equal(result.download.font_scale,1.1);assert.deepEqual(result.download.position,{x:60,y:90});assert.equal(result.preview,undefined);
+ await page.waitForFunction(()=>!document.querySelector('.fxi-live-text'));assert.equal(await page.locator('.fxi-panel').count(),0);
  }finally{await browser.close()}
 });
