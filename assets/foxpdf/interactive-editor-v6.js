@@ -601,6 +601,7 @@ function showInline(){
  field.focus({preventScroll:true});field.setSelectionRange(field.value.length,field.value.length);
 }
 async function chooseText(text,button,pageNum,box){
+ if(window.FoxPDFIntegrity?.editSelection){closeInline();window.FoxPDFIntegrity.editSelection({text,page:pageNum});return;}
  closeInline();view.querySelectorAll(".fxie-textregion").forEach(a=>a.classList.remove("selected"));button.classList.add("selected");
  selected={text,page:pageNum,box,button,revision:++localRevision,source:app.readCurrent()};
  $("fxieReplaceBox").hidden=false;$("fxieInsertBox").hidden=true;
@@ -1820,7 +1821,17 @@ window.addEventListener("resize",()=>{
   draw();if(splitPage)setSplitView(splitPage,true);
  },140);
 },{passive:true});
+async function fxieCommitVerified(source,bytes){
+ const job=async()=>{
+  const live=app.readCurrent();
+  if(!live||live.name!==source.name||!equalBytes(live.bytes,source.bytes))throw Error("The PDF changed while processing. Your newer edits were kept; inspect again.");
+  await app.replace(bytes.slice());fxieRememberUndo(source.bytes);inspectCache=null;selected=null;closeInline();
+  return true;
+ };
+ const run=fxieMutationChain.then(job,job);fxieMutationChain=run.then(()=>{},()=>{});return run;
+}
 window.FoxPDFInteractiveEditor={
+ commitVerified:fxieCommitVerified,
  open:(newMode="select")=>{if(!app.current()){window.FoxPDFTaskPicker?.launch(newMode==="draw"?"draw":"edit");return;}window.FoxPDFHomeNav?.showEditor();setMode(newMode)},
  openPages:()=>toggleOrganizer(true),
  setMode,
