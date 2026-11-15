@@ -199,15 +199,8 @@ function textInk(hex){const v=String(hex||"#172846").replace("#","");return PDFL
 async function paintMovableText(doc,session){
  const pg=doc.getPage(session.page-1),dimensions=pg.getSize();
  if(pg.getRotation().angle%360!==0)throw Error("This rotated page cannot be edited locally yet. Use Advanced reflow.");
- if(session.cover){
-  const b=session.cover.box,sc=b.scale;
-  const x=Math.max(0,b.x/sc),height=Math.max(2,b.height/sc),width=Math.max(2,b.width/sc);
-  const baseline=dimensions.height-b.baseline/sc,coverY=Math.max(0,baseline-2.1);
-  const coverHeight=Math.min(dimensions.height-coverY,height+5);
-  if(x+width>dimensions.width+5||coverY+coverHeight>dimensions.height+1)throw Error("Original text region outside page.");
-  pg.drawRectangle({x:Math.max(0,x-1.3),y:coverY,width:Math.min(width+3.5,dimensions.width-x+1.3),height:coverHeight,color:PDFLib.rgb(...session.cover.background.map(v=>v/255))});
- }
- if(!session.text.trim())return;
+ if(session.cover)throw Error("Original PDF text must be edited through the verified native editor.");
+  if(!session.text.trim())return;
  const font=await fxieEmbedSelectedFont(doc,session.fontName),size=session.size;
  const destX=Math.max(0,Math.min(dimensions.width-6,session.x));
  const destY=Math.max(0,Math.min(dimensions.height-size*.25,session.y));
@@ -614,36 +607,14 @@ $("fxieParagraph").onchange=()=>{if(selected)$("fxieReplacement").value=selected
 $("fxieReplacement").oninput=()=>{const textarea=inlineEditor?.querySelector("textarea");if(textarea&&textarea.value!==$("fxieReplacement").value)textarea.value=$("fxieReplacement").value};
 
 async function applyLocal(){
- const state=selected;
- if(!state?.box)return say("Click the text you want to edit first.",true);
- const value=(inlineEditor?.querySelector("textarea")?.value??$("fxieReplacement").value).replace(/\r/g,"");
- const delta=state.moveDelta||{x:0,y:0};
- const moved=Math.abs(delta.x)>1||Math.abs(delta.y)>1;
- if(value===state.text&&!moved){closeInline();$("fxieReplaceBox").hidden=true;selected=null;return say("No changes made.")}
- if(value.length>800)return say("For long text blocks, use Advanced reflow. Local editing allows 800 characters.",true);
- if(!rendered)return say("Page preview isn't ready.",true);
- if(state.page!==app.current()?.page)return say("The selected page changed. Select the text again.",true);
- const box=state.box,colors=samplePixels(box),scale=box.scale;
- const fontName=$("fxieFont").value,size=Number($("fxieSize").value),hex=$("fxieColor").value;
- if(!Number.isFinite(size)||size<5||size>80)return say("Choose a font size between 5 and 80.",true);
- if(!colors.uniform)say("Complex background detected: a local visual edit may look imperfect. Review before sharing.",true);
- const source=app.readCurrent();
- if(!source)return say("Please reopen your PDF.",true);
- if(!state.source||source.name!==state.source.name||!equalBytes(source.bytes,state.source.bytes))return say("The PDF changed. Select the text again before editing.",true);
- const sourceX=Math.max(0,box.x/scale),sourceY=rendered.originalHeight-box.baseline/scale;
- const x=Math.max(0,Math.min(rendered.originalWidth-6,sourceX+delta.x/scale));
- const y=Math.max(0,Math.min(rendered.originalHeight-size*.25,sourceY-delta.y/scale));
- const width=Math.max(18,Math.min(rendered.originalWidth-x-6,Math.max(box.width/scale*1.3,Math.max(value.length,state.text.length)*size*.6+20)));
- const session={page:state.page,name:source.name,baseBytes:source.bytes.slice(),text:value,size,fontName,hex,
-  fontFamily:box.fontFamily||"Arial",x,y,width,
-  cover:{box:{...box},background:colors.background.slice()}};
- const applied=await mutate(async doc=>{
-  const live=app.readCurrent();
-  if(!live||live.name!==source.name||!equalBytes(live.bytes,source.bytes))throw Error("The PDF changed before editing. Select the text again.");
-  await paintMovableText(doc,session);
- },
-  colors.uniform?"Text updated. Drag its outline to move it, then Save PDF.":"Text updated. Review the background and use the blue outline to move it.");
- if(applied){closeInline();$("fxieReplaceBox").hidden=true;selected=null;rememberMovable(session)}
+ // Existing PDF characters must be rewritten natively, never covered by
+ // an approximate background-color rectangle.
+ if(selected&&window.FoxPDFIntegrity?.editSelection){
+  const choice={text:selected.text,page:selected.page};
+  closeInline();selected=null;
+  return window.FoxPDFIntegrity.editSelection(choice);
+ }
+ say("Verified text editing is unavailable. Refresh and try again; the PDF is unchanged.",true);
 }
 $("fxieApply").onclick=()=>applyLocal();
 
@@ -1058,38 +1029,9 @@ function findReplacementSize(font,text,size,width){
  return fitSize;
 }
 async function findReplace(onlyCurrent){
- const replacement=findEl("fxFindWith").value;
- const targets=onlyCurrent?[fxieFind.hits[fxieFind.index]]:fxieFind.hits.slice();
- if(!targets.length||!targets[0])return;
- if(!onlyCurrent&&!confirm("Replace all "+targets.length+" visible text match(es) in this PDF? Complex formatting may change, and this does not securely erase original text."))return;
- const before=app.readCurrent();
- if(!before||before.name!==fxieFind.documentName||!equalBytes(before.bytes,fxieFind.documentBytes)){
-  say("Document changed since this search. Run Find all again before replacing text.",true);return;
- }
- const replacementFont=String(findEl("fxieFont")?.value||"Helvetica");
- const expected=before.bytes.slice();
- const ok=await mutate(async pdf=>{
-  const current=app.readCurrent();
-  if(!current||current.name!==before.name||!equalBytes(current.bytes,expected))throw Error("Document changed before replacement. Run Find all again.");
-  if(pdf.getPageCount()<Math.max(...targets.map(t=>t.page)))throw Error("Pages changed");
-  // Batch all matches into one PDF write and one undo step. These edits are visual,
-  // not true content-stream replacement or secure removal.
-  const font=await fxieEmbedSelectedFont(pdf,replacementFont);
-  for(const hit of targets){
-   const page=pdf.getPage(hit.page-1);
-   if(page.getRotation().angle%360!==0||hit.rotated)throw Error("Rotated text or pages require advanced text editing");
-   const x=Math.max(0,hit.x),baseline=page.getHeight()-hit.baseline;
-   const size=Math.max(5,Math.min(65,hit.fontHeight));
-   const coverWidth=Math.max(hit.width,3);
-   page.drawRectangle({x,y:Math.max(0,baseline-2),width:Math.min(coverWidth+2,page.getWidth()-x),height:Math.min(size+5,page.getHeight()-Math.max(0,baseline-2)),color:PDFLib.rgb(1,1,1)});
-   // Keep replacement text inside the original word's width so it cannot overwrite its neighbours.
-   if(replacement){
-    const fitSize=findReplacementSize(font,replacement,size,hit.width);
-    page.drawText(replacement,{x,y:Math.max(0,baseline),size:fitSize,font,color:color()});
-   }
-  }
- },"Replaced "+targets.length+" visible occurrence(s). Review the result and save.");
- if(ok){await findScan();say("Replacements applied. Original text may still be searchable; not secure redaction.")}
+ // Only native text replacement removes original PDF glyphs reliably.
+ if(window.FoxPDFIntegrity?.open)return window.FoxPDFIntegrity.open("search");
+ say("Verified Find & Replace is unavailable. Refresh and try again; no changes were made.",true);
 }
 bind("fxieSearch",()=>{if(window.FoxPDFIntegrity)return window.FoxPDFIntegrity.open("search");findBox.hidden=!findBox.hidden;if(!findBox.hidden){findEl("fxFindWord").focus();if(fxieFind.query)findScan()}else findRefreshVisible()});
 findEl("fxFindClose").onclick=()=>{findBox.hidden=true;findRefreshVisible()};
