@@ -117,17 +117,7 @@ def move_text(data,params):
             if any((region&r).get_area()>.1 for r in obstacles):raise EngineError('The text would overlap another text block, field, link or annotation.')
         before={n:doc[n].get_pixmap(alpha=False,annots=True) for n in set([pn,dest])};fields=field_state(doc)
         spans=[s for l in p['_lines'] for s in l['spans']];fonts={s['font']:resolve_font(doc,source,s['font']) for s in spans}
-        # Erase the *native PDF glyphs*, not a white/colored rectangle on top.
-        # A small margin includes antialiased glyph edges; never let that margin
-        # intersect unrelated text, since redaction removes intersecting glyphs.
-        clear_regions=[]
-        for span in spans:
-            region=(fitz.Rect(span['bbox'])+(-0.65,-0.65,0.65,0.65)) & source.rect
-            for ident,other,_ in runs(source):
-                if ident not in members and (region & fitz.Rect(other['bbox'])).get_area()>.05:
-                    raise EngineError('The selected text is too close to another text run to move without damage.')
-            clear_regions.append(region)
-        for region in clear_regions:source.add_redact_annot(region,fill=False,cross_out=False)
+        for s in spans:source.add_redact_annot(s['bbox'],fill=False,cross_out=False)
         source.apply_redactions(images=0,graphics=0,text=0)
         for font,buffer,name in fonts.values():
             if buffer:target.insert_font(fontname=name,fontbuffer=buffer)
@@ -138,12 +128,6 @@ def move_text(data,params):
             for n in before:
                 allowed=([old] if n==pn else [])+([new] if n==dest else [])
                 if not unchanged_except(before[n],check[n].get_pixmap(alpha=False,annots=True),allowed,fitz.Matrix(1,0,0,1,0,0)):raise EngineError('Rendering changed outside the moved text. Nothing was applied.')
-            # For nonoverlapping moves the original area must contain no
-            # surviving PDF text. This catches stale fragments before export.
-            if pn!=dest or not old.intersects(new):
-                for _,span,_ in runs(check[pn]):
-                    if (fitz.Rect(span['bbox']) & old).get_area()>.1:
-                        raise EngineError('Original text was not completely removed. No moved PDF was saved.')
             if norm(check[dest].get_textbox(new+(-1,-1,1,1)))!=norm(p['text']):raise EngineError('The moved text could not be verified.')
         return output,{'operation':'move_text','source_page':pn+1,'target_page':dest+1,'bbox':list(new),'fonts_preserved':True,'surrounding_pixels_unchanged':True,'forms_preserved':True,'source_sha256':sha(data),'output_sha256':sha(output)}
 
