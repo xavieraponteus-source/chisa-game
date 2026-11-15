@@ -6,6 +6,7 @@ COPY services/foxpdf-integrity/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY services/foxpdf-integrity/engine.py services/foxpdf-integrity/server.py services/foxpdf-integrity/layout.py services/foxpdf-integrity/tables.py services/foxpdf-integrity/operations.py ./integrity/
 COPY services/foxpdf-web/server.js ./web/server.js
+COPY assets/foxpdf/interactive-editor-v6.js ./web/assets/interactive-editor-v6.js
 COPY services/foxpdf-web/start.sh ./start.sh
 ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata PYTHONUNBUFFERED=1
 RUN useradd --create-home foxpdf
