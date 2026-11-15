@@ -2,7 +2,7 @@
 import difflib, math, re, unicodedata
 from collections import Counter
 import pymupdf as fitz
-from engine import EngineError, open_pdf, sha, norm, resolve_font, field_state, outside_pixels_unchanged, ensure_visible_text
+from engine import EngineError, open_pdf, sha, norm, resolve_font, field_state, outside_pixels_unchanged, ensure_visible_text, original_ink_bounds, runs
 
 
 def paragraphs(page):
@@ -178,6 +178,11 @@ def edit_paragraph(data, params, region_override=None):
         if plan is None and params.get("flow"):
             scale=1.0;plan=layout(scale,True)
         if plan is None:raise EngineError("The paragraph does not fit. Allow safe downward growth or smaller text, or shorten the replacement.")
+        verification_region=fitz.Rect(region)
+        for identifier,span,_ in runs(page):
+            if identifier in p['_members']:
+                original_font=resolve_font(doc,page,span['font'])[0]
+                verification_region|=original_ink_bounds(page,identifier,original_font)
         before=page.get_pixmap(alpha=False,annots=True);fields=field_state(doc);rotation_matrix=fitz.Matrix(page.rotation_matrix)
         # Remove only selected original span rectangles, never images or background graphics.
         for line in p["_lines"]:
@@ -204,7 +209,7 @@ def edit_paragraph(data, params, region_override=None):
         if len(output)>40*1024*1024:raise EngineError("The edited PDF exceeds 40 MB. Split the document first.")
         with fitz.open(stream=output,filetype="pdf") as check:
             if len(check)!=original_count+extra_pages or field_state(check)!=fields:raise EngineError("Page or form verification failed.")
-            if not outside_pixels_unchanged(before,check[pn].get_pixmap(alpha=False,annots=True),region,rotation_matrix):
+            if not outside_pixels_unchanged(before,check[pn].get_pixmap(alpha=False,annots=True),verification_region,rotation_matrix):
                 raise EngineError("Rendering changed outside the paragraph. No edited copy was created.")
             actual=norm(check[pn].get_textbox(region+(-1,-1,1,1)))
             for target in targets[1:]:actual+=" "+norm(check[target].get_text())

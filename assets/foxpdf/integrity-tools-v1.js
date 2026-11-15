@@ -126,7 +126,9 @@ function paragraph(selection=null){
   const selected=()=>info.pages.find(p=>p.page===Number(page.value))?.paragraphs.find(p=>p.id===choice.value);
   const show=()=>{const p=selected();text.value=p?.text||"";summary.textContent=p?p.line_count+" original lines · "+p.fonts.join(", ")+" · "+Math.round(p.bbox[2]-p.bbox[0])+" pt wide · up to "+Math.round(p.available_bbox[3]-p.bbox[1])+" pt high with safe growth":"No paragraphs found. Run OCR on an image-only PDF first."};
   const changed=()=>{choice.replaceChildren();for(const p of info.pages.find(p=>p.page===Number(page.value))?.paragraphs||[]){const o=make("option",(p.editable?"":"Unsupported · ")+p.text.slice(0,140));o.value=p.id;choice.append(o)}show()};page.onchange=changed;choice.onchange=show;page.value=String(selection?.page||app.current()?.page||1);changed();
-  if(selection?.text){const matches=info.pages.find(p=>p.page===Number(page.value))?.paragraphs.filter(p=>p.text.includes(selection.text.trim()))||[];if(matches.length===1){choice.value=matches[0].id;show()}}
+  if(selection?.text){const inspectedPage=info.pages.find(p=>p.page===Number(page.value));let matches=inspectedPage?.paragraphs.filter(p=>p.text.includes(selection.text.trim()))||[];
+   if(selection.bbox&&inspectedPage?.rotation===0){const r=selection.bbox;matches=matches.filter(p=>p.bbox[0]<r[2]&&p.bbox[2]>r[0]&&p.bbox[1]<r[3]&&p.bbox[3]>r[1])}
+   if(matches.length===1){choice.value=matches[0].id;show()}}
   const apply=button("Apply paragraph",async()=>{apply.disabled=true;ui.status.textContent="Wrapping text, saving and checking surrounding content…";try{
    if(!same(source,app.readCurrent()))throw Error("The document changed. Inspect the current copy again.");
    const p=selected();if(!p||!p.editable)throw Error("Choose a supported horizontal paragraph. Use Precise text for rotated runs.");

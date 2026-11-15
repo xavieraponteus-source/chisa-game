@@ -48,6 +48,24 @@ def ensure_visible_text(page,rect):
             raise EngineError("This is hidden/OCR text. Recognition makes a scan searchable; native text editing cannot rewrite its underlying image. Use redaction or rebuild the text area instead.")
 
 
+def original_ink_bounds(page,identifier,font,clip=None):
+    """Include italic overhangs using each original character's actual baseline origin.
+
+    This expands verification only. Redaction still selects the original run rectangle,
+    so a wider italic bounding box never deletes neighboring characters.
+    """
+    bi,li,si=map(int,identifier.split(':'))
+    line=page.get_text('rawdict')['blocks'][bi]['lines'][li];span=line['spans'][si]
+    bounds=fitz.Rect(clip if clip is not None else span['bbox']);dx,dy=line.get('dir',(1,0));size=span['size']
+    for char in span['chars']:
+        if clip is not None and (fitz.Rect(char['bbox'])&fitz.Rect(clip)).get_area()<.1:continue
+        if char['c'].isspace() or len(char['c'])!=1:continue
+        glyph=font.glyph_bbox(ord(char['c']));ox,oy=char['origin']
+        points=[fitz.Point(ox+size*(u*dx+v*dy),oy+size*(u*dy-v*dx)) for u in (glyph.x0,glyph.x1) for v in (glyph.y0,glyph.y1)]
+        bounds|=fitz.Rect(min(p.x for p in points),min(p.y for p in points),max(p.x for p in points),max(p.y for p in points))
+    return bounds
+
+
 def inspect_pdf(data):
     from layout import inspect_paragraphs
     with open_pdf(data) as doc:
@@ -145,6 +163,7 @@ def edit_run(data, params):
         if min(abs(angle - rotate), abs(angle - rotate - 360)) > .1:
             raise EngineError("Arbitrarily angled text cannot be changed safely yet.")
         font, buffer, fontname = resolve_font(doc, page, span["font"])
+        verification_rect=original_ink_bounds(page,params['run_id'],font)
         if any(not font.has_glyph(ord(c)) for c in text if not c.isspace()):
             raise EngineError("The original font does not contain every replacement character.")
         size = float(span["size"])
@@ -166,7 +185,7 @@ def edit_run(data, params):
         page.insert_text(span["origin"], text, fontsize=size, fontname=fontname, rotate=rotate,
                          color=color, fill_opacity=span.get("alpha", 255) / 255)
         after = page.get_pixmap(alpha=False, annots=True)
-        if not outside_pixels_unchanged(before, after, rect, page.rotation_matrix):
+        if not outside_pixels_unchanged(before, after, verification_rect, page.rotation_matrix):
             raise EngineError("Rendering changed outside the selected run. No edited copy was committed.")
         output = doc.tobytes(garbage=4, deflate=True)
         with fitz.open(stream=output, filetype="pdf") as reopened:
@@ -242,7 +261,14 @@ def redact_image_copy(data, params, ocr=None):
                     hits += list(page.search_for(term, textpage=textpage))
                 unique = {tuple(round(v, 2) for v in rect):rect for rect in hits}
                 counts[term] += len(unique)
-                boxes.extend(unique.values())
+                for hit in unique.values():
+                    ink=fitz.Rect(hit)
+                    for identifier,span,_ in runs(page):
+                        if (hit&fitz.Rect(span['bbox'])).get_area()>.1:
+                            try:font=resolve_font(doc,page,span['font'])[0]
+                            except EngineError:raise EngineError("A detected phrase uses an unsupported font. Mark its full visible area manually instead.")
+                            ink|=original_ink_bounds(page,identifier,font,clip=hit)
+                    boxes.append(ink)
             # Paint on fresh pixels, not source PDF objects. This keeps background graphics intact
             # while ensuring the output cannot carry recoverable covered text or source images.
             pix = page.get_pixmap(dpi=dpi, alpha=False, annots=False)
