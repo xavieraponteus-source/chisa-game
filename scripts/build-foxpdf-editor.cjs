@@ -8,7 +8,7 @@ function build(){
  let moduleSource=fs.readFileSync(path.join(root,'assets/foxpdf/integrity-tools-v1.js'),'utf8').replace(/\r\n/g,'\n');
  const cssLoader=/const css=document\.createElement\("link"\);css\.rel="stylesheet";css\.href="[^"\n]+";document\.head\.append\(css\);/;
  if(!cssLoader.test(moduleSource))throw Error('Original-text style loader changed; update the bundle builder.');
- moduleSource=moduleSource.replace(cssLoader,'const css=document.createElement("style");css.dataset.foxpdfIntegrity="2.0";css.textContent='+JSON.stringify(styles)+';document.head.append(css);');
+ moduleSource=moduleSource.replace(cssLoader,'const css=document.createElement("style");css.dataset.foxpdfIntegrity="2.1";css.textContent='+JSON.stringify(styles)+';document.head.append(css);');
  return core+'\n\n'+marker+'\n'+moduleSource.trimEnd()+'\n';
 }
 if(require.main===module)fs.writeFileSync(path.join(root,'assets/foxpdf/interactive-editor-v6.js'),build(),'utf8');

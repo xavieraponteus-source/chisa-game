@@ -242,7 +242,7 @@ async function v3Admin(req,url){
 
 const v3Hub=hubPage.replace('<style>','<style>.loader{display:none!important}').replace('href="/pdf"','href="https://xavier-is-working.com/pdf"').replace('</main>','<div style="text-align:center;margin:18px auto;font:12px system-ui"><a style="color:#dbb6df;text-decoration:underline" href="https://foxpdf-studio-web-production.up.railway.app/admin">Admin login</a></div></main>').replace('</body>','<script defer data-section="hub" src="'+V3_ASSETS+'tracker-v3.js?v=3.2"></script></body>');
 const v3PdfBase=page.replace("interactive-editor-v6.js?v=13.1","interactive-editor-v6.js?v=18.7").replace("interactive-editor-v6.css?v=13.1","interactive-editor-v6.css?v=18.2").replace("gold-dashboard-v4.js?v=13.1","gold-dashboard-v4.js?v=18.0").replace("gold-dashboard-v4.css?v=13.0","gold-dashboard-v4.css?v=18.0").replace('</body>','<script defer data-section="pdf" src="'+V3_ASSETS+'tracker-v3.js?v=3.2"></script></body>');
-const v3Pdf=v3PdfBase.replace(/interactive-editor-v6.js\?v=[0-9.]+/g,"interactive-editor-v6.js?v=21.6").replace(/task-picker-v13.js\?v=[0-9.]+/g,"task-picker-v13.js?v=21.0");
+const v3Pdf=v3PdfBase.replace(/interactive-editor-v6.js\?v=[0-9.]+/g,"interactive-editor-v6.js?v=21.7").replace(/task-picker-v13.js\?v=[0-9.]+/g,"task-picker-v13.js?v=21.0");
 
 
 async function foxIntegrityProxy(req){
