@@ -762,6 +762,7 @@ function showMovableInk(sheet,pageOverride,scaleOverride,dimensions){
  updatePosition();
  let interaction=null;
  frame.addEventListener("pointerdown",e=>{
+  if(state.busy)return;
   if(e.pointerType==="mouse"&&e.button!==0)return;
   if(e.target.closest(".fxie-ink-control:not(.fxie-ink-move)"))return;
   const type=e.target.closest(".fxie-ink-corner")?"free":e.target.closest(".fxie-ink-width")?"width":e.target.closest(".fxie-ink-height")?"height":"move";
@@ -784,7 +785,7 @@ function showMovableInk(sheet,pageOverride,scaleOverride,dimensions){
   if(state.busy||targetPage===state.page||!equalBytes(currentBytes(),state.latestBytes))return;
   if(targetPage<1||targetPage>app.current().pages)return;
   state.busy=true;
-  const oldPage=state.page,oldBox={...state.box},oldLatest=state.latestBytes;
+  const oldPage=state.page,oldBox={...state.box},oldLatest=state.latestBytes,oldWidth=state.pageWidth,oldHeight=state.pageHeight;
   try{
    const pdf=await PDFLib.PDFDocument.load(state.baseBytes.slice());
    const destination=pdf.getPage(targetPage-1),width=destination.getWidth(),height=destination.getHeight();
@@ -802,19 +803,19 @@ function showMovableInk(sheet,pageOverride,scaleOverride,dimensions){
    paintInkSession(pdf,state);
    const output=new Uint8Array(await pdf.save({useObjectStreams:true}));
    if(!equalBytes(currentBytes(),oldLatest))throw Error("PDF changed during move");
-   const previous=app.readCurrent().bytes;fxieRememberUndo(previous);
+   const snapshot=app.readCurrent();
+   await fxieCommitVerified(snapshot,output);
    state.latestBytes=output.slice();
-   await app.replace(output);
    say("Drawing moved to page "+targetPage+". Drag or resize it again, then save.");
    if(targetPage===splitPage)requestAnimationFrame(()=>{const right=splitPane?.querySelector(".fxie-right-edit-sheet");if(right)showMovableInk(right,targetPage,Number(right.dataset.imageScale)||1,{width,height})});
    else requestAnimationFrame(()=>{const left=$("fxieSheetWrap").querySelector(".fxie-sheet");if(left)showMovableInk(left)});
   }catch(err){
-   state.page=oldPage;state.box=oldBox;state.latestBytes=oldLatest;
+   state.page=oldPage;state.box=oldBox;state.latestBytes=oldLatest;state.pageWidth=oldWidth;state.pageHeight=oldHeight;
    say("Unable to transfer drawing: "+String(err?.message||err),true);
   }finally{state.busy=false}
  }
  async function commit(next,previous,description){
-  if(state.busy)return;
+  if(state.busy){state.box={...previous};updatePosition();return;}
   if(!equalBytes(currentBytes(),state.latestBytes)){
    frame.remove();inkSession=null;say("PDF changed. Draw again to select a new stroke.",true);return;
   }
@@ -825,12 +826,11 @@ function showMovableInk(sheet,pageOverride,scaleOverride,dimensions){
    paintInkSession(doc,state);
    const updated=new Uint8Array(await doc.save({useObjectStreams:true}));
    if(!equalBytes(currentBytes(),state.latestBytes))throw Error("PDF changed while adjusting drawing");
-   const old=app.readCurrent()?.bytes;
-   if(old)fxieRememberUndo(old);
+   const snapshot=app.readCurrent();
+   await fxieCommitVerified(snapshot,updated);
    state.latestBytes=updated.slice();
-   await app.replace(updated);
    say(description||"Drawing updated. Move or resize it again, then Save PDF.");
-   const now=$("fxieSheetWrap").querySelector(".fxie-sheet");if(now)showMovableInk(now);
+   requestAnimationFrame(()=>{const now=state.page===splitPage?splitPane?.querySelector(".fxie-right-edit-sheet"):$("fxieSheetWrap").querySelector(".fxie-sheet");if(now)showMovableInk(now,state.page,sc,{width:w,height:h})});
   }catch(err){
    state.box={...previous};updatePosition();
    say("Couldn't adjust drawing: "+err.message,true);
@@ -854,8 +854,7 @@ function showMovableInk(sheet,pageOverride,scaleOverride,dimensions){
  });
  frame.addEventListener("lostpointercapture",e=>{
   if(interaction?.id!==e.pointerId)return;
-  const v=interaction;interaction=null;
-  if(Object.keys(state.box).some(k=>Math.abs(state.box[k]-v.rect[k])>.3))commit({...state.box},v.rect,"Drawing adjusted.");
+  const v=interaction;interaction=null;state.box={...v.rect};frame.classList.remove("fxie-ink-dragging");updatePosition();
  });
  const stopEvent=e=>{e.preventDefault();e.stopPropagation()};
  for(const a of [smaller,bigger,other,more,done,remove])a.addEventListener("pointerdown",stopEvent);
@@ -867,11 +866,10 @@ function showMovableInk(sheet,pageOverride,scaleOverride,dimensions){
  remove.onclick=async e=>{
   stopEvent(e);if(state.busy||!equalBytes(currentBytes(),state.latestBytes))return;
   const previous=app.readCurrent()?.bytes.slice();if(!previous)return;
-  fxieRememberUndo(previous);
-  inkSession=null;frame.remove();await app.replace(state.baseBytes.slice());
-  say("Drawing removed. Use Undo if you want it back.");
+  state.busy=true;try{await fxieCommitVerified(app.readCurrent(),state.baseBytes.slice());inkSession=null;frame.remove();say("Drawing removed. Use Undo if you want it back.")}catch(err){say("Unable to remove drawing: "+err.message,true)}finally{state.busy=false}
  };
- sheet.append(frame);
+ frame.addEventListener("click",e=>e.stopPropagation());
+ sheet.append(frame);fxiePositionImageToolbar(frame,toolbar,sheet);
 }
 
 /* Advanced reflow stays explicit and opt-in; ordinary clicks never send PDFs to a server. */
@@ -1091,7 +1089,7 @@ async function findReplace(onlyCurrent){
  },"Replaced "+targets.length+" visible occurrence(s). Review the result and save.");
  if(ok){await findScan();say("Replacements applied. Original text may still be searchable; not secure redaction.")}
 }
-bind("fxieSearch",()=>{findBox.hidden=!findBox.hidden;if(!findBox.hidden){findEl("fxFindWord").focus();if(fxieFind.query)findScan()}else findRefreshVisible()});
+bind("fxieSearch",()=>{if(window.FoxPDFIntegrity)return window.FoxPDFIntegrity.open("search");findBox.hidden=!findBox.hidden;if(!findBox.hidden){findEl("fxFindWord").focus();if(fxieFind.query)findScan()}else findRefreshVisible()});
 findEl("fxFindClose").onclick=()=>{findBox.hidden=true;findRefreshVisible()};
 findEl("fxFindRun").onclick=findScan;
 findEl("fxFindPrevious").onclick=()=>findSelect(fxieFind.index-1);
@@ -1832,6 +1830,15 @@ async function fxieCommitVerified(source,bytes){
 }
 window.FoxPDFInteractiveEditor={
  commitVerified:fxieCommitVerified,
+ pdfjs:getJs,
+ otherPage:()=>splitPage,
+ openBeside:page=>setSplitView(page),
+ pageSurface:page=>{
+  const right=page===splitPage&&page!==app.current()?.page;
+  const sheet=right?splitPane?.querySelector(".fxie-right-edit-sheet"):page===app.current()?.page?$("fxieSheetWrap").querySelector(".fxie-sheet"):null;
+  const scale=right?Number(sheet?.dataset.imageScale):rendered?.scale;
+  return sheet&&scale?{sheet,scale}:null;
+ },
  open:(newMode="select")=>{if(!app.current()){window.FoxPDFTaskPicker?.launch(newMode==="draw"?"draw":"edit");return;}window.FoxPDFHomeNav?.showEditor();setMode(newMode)},
  openPages:()=>toggleOrganizer(true),
  setMode,

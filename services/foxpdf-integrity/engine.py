@@ -194,12 +194,22 @@ def redact_image_copy(data, params, ocr=None):
     if not isinstance(params.get("terms"), list) or any(not isinstance(t, str) for t in params["terms"]):
         raise EngineError("Enter phrases as a list of text strings.")
     terms = list(dict.fromkeys(str(t).strip() for t in params.get("terms", []) if str(t).strip()))
-    if not terms or len(terms) > 20 or any(len(t) > 200 for t in terms):
-        raise EngineError("Enter 1 to 20 exact phrases, each up to 200 characters.")
+    regions=params.get("rectangles",[])
+    if not isinstance(regions,list) or len(regions)>100: raise EngineError("Choose up to 100 redaction regions.")
+    if (not terms and not regions) or len(terms) > 20 or any(len(t) > 200 for t in terms):
+        raise EngineError("Enter up to 20 exact phrases or mark a redaction region.")
     dpi = int(params.get("dpi", 150))
     if dpi not in (150, 200):
         raise EngineError("Choose 150 or 200 DPI.")
     with open_pdf(data) as doc, fitz.open() as rebuilt:
+        selected={}
+        for region in regions:
+            try:
+                n=int(region['page'])-1;r=fitz.Rect(region['bbox'])
+                if n<0 or n>=len(doc) or not all(math.isfinite(v) for v in r) or r.is_empty or not doc[n].rect.contains(r): raise ValueError()
+                r=r*doc[n].derotation_matrix
+            except (KeyError,TypeError,ValueError): raise EngineError("A marked region is invalid or outside its page.")
+            selected.setdefault(n,[]).append(r)
         if doc.get_sigflags() > 0 and not params.get("allow_signed_copy"):
             raise EngineError("This export removes existing signatures. Explicitly acknowledge creating an unsigned copy.")
         counts = {term:0 for term in terms}
@@ -213,11 +223,11 @@ def redact_image_copy(data, params, ocr=None):
             if language not in ("eng", "eng+spa", "eng+jpn"):
                 raise EngineError("Choose a supported OCR language.")
             try:
-                textpage = ocr(page) if ocr else page.get_textpage_ocr(language=language, dpi=180, full=True)
+                textpage = (ocr(page) if ocr else page.get_textpage_ocr(language=language, dpi=180, full=True)) if terms else None
             except Exception as exc:
                 raise EngineError("OCR is required for high-assurance phrase detection but could not finish. No redacted copy was exported.") from exc
-            ocr_pages.append(number + 1)
-            boxes = []
+            if terms: ocr_pages.append(number + 1)
+            boxes = list(selected.get(number,[]))
             for term in terms:
                 hits = list(page.search_for(term))
                 if textpage is not None:
@@ -247,6 +257,6 @@ def redact_image_copy(data, params, ocr=None):
             raise EngineError("The rebuilt copy exceeds 40 MB. Split the original into smaller documents.")
         checks = audit_image_only(output)
         return output, {"operation":"redact_image_copy", "page_count":len(doc), "matches":counts,
-                        "ocr_pages":ocr_pages, "dpi":dpi, "checks":checks,
+                        "ocr_pages":ocr_pages, "manual_regions":len(regions), "dpi":dpi, "checks":checks,
                         "source_sha256":sha(data), "output_sha256":sha(output),
                         "warning":"Image-only copy: text search, forms, annotations and existing signatures are removed. Review all visible pages before sharing. Detection is limited to the phrases and OCR results reported here."}
