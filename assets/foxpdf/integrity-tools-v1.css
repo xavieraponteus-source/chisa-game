@@ -29,3 +29,10 @@ body:has(.fxi-docked) #chatFab{display:none!important}
 .fxie-root .fxie-ink-toolbar{flex-wrap:wrap!important;justify-content:flex-start!important}
 .fxi-redact-layer{position:absolute;inset:0;z-index:85;cursor:crosshair;touch-action:none;background:#0001}.fxi-redact-outline{position:absolute;background:#0009;border:2px solid #ff5757;box-sizing:border-box;pointer-events:none}.fxi-compare-preview{min-width:0}.fxi-compare-preview canvas{display:block;max-width:100%;height:auto;background:white}
 @media(max-width:700px){.fxie-root .fxie-topright #fxieDrawSignature,.fxie-root .fxie-topright #fxieDigitalSign{font-size:0!important;min-width:42px!important;padding:6px!important}.fxie-root .fxie-topright #fxieDrawSignature::after{content:"Draw";font-size:12px}.fxie-root .fxie-topright #fxieDigitalSign::after{content:"Sign";font-size:12px}.fxie-root .fxie-topright{gap:3px!important}.fxie-root .fxie-topbar{padding-left:6px!important;padding-right:6px!important;gap:4px!important}}
+
+.fxi-live-background{position:absolute;inset:0;width:100%;height:100%;z-index:74;pointer-events:none}
+.fxi-live-text{position:absolute;z-index:81;min-height:1em;padding:0;margin:0;line-height:1.15;white-space:pre-wrap;overflow-wrap:normal;outline:1px dashed #be8a2e;background:transparent;cursor:text;text-align:left;box-sizing:border-box}
+.fxi-live-text:focus{outline:2px solid #d8ac51}
+.fxi-live-toolbar{position:absolute;z-index:90;display:flex;align-items:center;gap:3px;padding:3px;background:#26282e;border:1px solid #d8ac51;border-radius:6px;white-space:nowrap;color:#fff;font:12px system-ui;max-width:100%}
+.fxie-root .fxi-live-toolbar button{font:600 12px system-ui!important;min-height:30px;min-width:32px;padding:4px 7px;color:#211b12!important;background:#e7c573!important;touch-action:manipulation}
+.fxie-root .fxi-live-toolbar button:first-child{touch-action:none;cursor:move}

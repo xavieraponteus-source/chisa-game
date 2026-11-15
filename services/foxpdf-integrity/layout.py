@@ -82,6 +82,9 @@ def inspect_paragraphs(page):
     for p in paragraphs(page):
         item={k:v for k,v in p.items() if not k.startswith("_")}
         item["fonts"]=list(dict.fromkeys(s["font"] for s in p["_styles"]))
+        first=p["_styles"][0]
+        item["font_size"]=first["size"];item["color"]=first["color"]
+        item["bold"]=bool(first.get("flags",0)&16);item["italic"]=bool(first.get("flags",0)&2)
         try:item["available_bbox"]=list(safe_region(page,p,True))
         except EngineError:item["editable"]=False;item["available_bbox"]=item["bbox"]
         output.append(item)
@@ -106,7 +109,7 @@ def edit_paragraph(data, params, region_override=None):
         from tables import edit_growing_table
         return edit_growing_table(data,params)
     text=params.get("text","")
-    if not isinstance(text,str) or not text.strip() or len(text)>10000:raise EngineError("Enter a paragraph of 1 to 10,000 characters.")
+    if not isinstance(text,str) or len(text)>10000:raise EngineError("Enter up to 10,000 characters.")
     text=text.replace("\r\n","\n").replace("\r","\n").replace("\t","    ")
     if any(unicodedata.bidirectional(c) in ("R","AL","AN","RLE","RLO","RLI") for c in text):
         raise EngineError("Right-to-left paragraph shaping is not supported by this reflow tool yet.")
@@ -123,9 +126,18 @@ def edit_paragraph(data, params, region_override=None):
         ensure_visible_text(page,p['bbox'])
         if any(a.type[0]==fitz.PDF_ANNOT_REDACT for a in (page.annots() or [])):
             raise EngineError("Apply or remove existing redaction marks first.")
-        region=safe_region(page,p,bool(params.get("grow")))
+        try:
+            font_scale=float(params.get("font_scale",1))
+            if not math.isfinite(font_scale) or not .25<=font_scale<=4:raise ValueError()
+        except (ValueError,TypeError):raise EngineError("Text size must be between 25% and 400%.")
+        if min(s["size"] for s in p["_styles"])*font_scale<6:raise EngineError("Text must stay at least 6 points.")
+        adjusted={**p,"bbox":list(p["bbox"])}
+        adjusted["bbox"][2]=min((page.rect*page.derotation_matrix).x1-2,p["bbox"][0]+(p["bbox"][2]-p["bbox"][0])*max(1,font_scale))
+        region=safe_region(page,adjusted,bool(params.get("grow")))
         if region_override is not None:region=fitz.Rect(region_override)
         styles=styled_replacement(p["text"],p["_styles"],text,params.get("preserve_styles",True))
+        scaled={}
+        styles=[scaled.setdefault(id(s),{**s,"size":s["size"]*font_scale,"_rise":s.get("_rise",0)*font_scale}) for s in styles]
         fonts={}
         for s in styles:
             if s["font"] not in fonts:fonts[s["font"]]=resolve_font(doc,page,s["font"])
@@ -216,8 +228,23 @@ def edit_paragraph(data, params, region_override=None):
             # Extraction can introduce line/space boundaries; compare visible non-whitespace text.
             if re.sub(r"\s+","",norm(text))!=re.sub(r"\s+","",actual):
                 raise EngineError("The saved paragraph text could not be verified. No edited copy was created.")
-        return output,{"operation":"edit_paragraph","page":pn+1,"line_count":plan[1],"font_scale":scale,
+        report={"operation":"edit_paragraph","page":pn+1,"line_count":plan[1],"font_scale":scale,
                        "styles_preserved":bool(params.get("preserve_styles",True)),"fonts_reused":list(fonts),
                        "surrounding_pixels_unchanged":True,"forms_preserved":True,"page_count_preserved":extra_pages==0,
                        "output_page_count":len(doc),"continuation_pages":[i+1 for i in targets[1:]],
                        "paragraph_bbox":list(region),"source_sha256":sha(data),"output_sha256":sha(output)}
+
+        if params.get("position") is not None:
+            if extra_pages or params.get("table_grow"):raise EngineError("Finish continuation or table growth before moving text.")
+            if text.strip():
+                from operations import move_text
+                with fitz.open(stream=output,filetype="pdf") as placed:
+                    matches=[q for q in paragraphs(placed[pn]) if re.sub(r"\s+","",norm(q["text"]))==re.sub(r"\s+","",norm(text)) and (fitz.Rect(q["bbox"])&region).get_area()>0]
+                    if len(matches)!=1:raise EngineError("The edited paragraph could not be selected safely for movement.")
+                    q=matches[0]
+                pos=params["position"]
+                if not isinstance(pos,dict):raise EngineError("Choose a valid text position.")
+                output,moved=move_text(output,{"source_sha256":sha(output),"page":pn+1,"paragraph_id":q["id"],"target_page":pn+1,"x":pos.get("x"),"y":pos.get("y")})
+                report["moved_bbox"]=moved["bbox"];report["output_sha256"]=sha(output)
+        report["requested_font_scale"]=font_scale
+        return output,report

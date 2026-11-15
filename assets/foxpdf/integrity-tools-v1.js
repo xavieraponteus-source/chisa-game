@@ -2,25 +2,28 @@
 (function(){"use strict";
 const ready=fn=>document.readyState==="loading"?document.addEventListener("DOMContentLoaded",fn,{once:true}):fn();
 ready(()=>{
-if(window.FoxPDFIntegrity?.version==="1.9")return;
+if(window.FoxPDFIntegrity?.version==="2.0")return;
 const app=window.FoxPDFBridge;if(!app)return;
 const make=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};
 const css=document.createElement("link");css.rel="stylesheet";css.href="/fox-assets/integrity-tools-v1.css?v=1.7";document.head.append(css);
+let liveEdit=null;
 let modal=null,lastFocus=null,keyTrap=null,fabState=null,clearHandle=null,layoutCache=null;
 const same=(a,b)=>!!a&&!!b&&a.name===b.name&&a.bytes.length===b.bytes.length&&a.bytes.every((v,i)=>v===b.bytes[i]);
+async function finishLive(){if(liveEdit){await liveEdit.flush();liveEdit?.cleanup()}}
+function requestClose(){finishLive().then(close).catch(e=>app.say(e.message))}
 function close(){clearHandle?.();if(keyTrap)document.removeEventListener("keydown",keyTrap,true);keyTrap=null;const fab=document.getElementById("chatFab");if(fabState&&fab){if(fabState.value)fab.style.setProperty("display",fabState.value,fabState.priority);else fab.style.removeProperty("display")}fabState=null,clearHandle=null;modal?.parentElement?.classList.remove("fxi-docked");modal?.remove();modal=null;lastFocus?.focus?.();window.dispatchEvent(new Event("resize"))}
-function button(text,action,primary=false){const e=make("button",text,primary?"fxi-primary":"");e.type="button";e.onclick=action;return e}
+function button(text,action,primary=false){const e=make("button",text,primary?"fxi-primary":"");e.type="button";e.onclick=async event=>{try{if(liveEdit&&!e.closest(".fxi-live-toolbar")&&!e.closest(".fxi-body"))await finishLive();await action(event)}catch(err){app.say(err.message)}};return e}
 function field(label,control){const e=make("label");e.append(make("span",label),control);return e}
 function select(choices){const e=make("select");for(const [value,label] of choices){const o=make("option",label);o.value=value;e.append(o)}return e}
 function dialog(title){
  close();lastFocus=document.activeElement;modal=make("aside",undefined,"fxi-panel");
  const box=make("section",undefined,"fxi-dialog");box.setAttribute("role","region");box.setAttribute("aria-label",title);
- const header=make("header");header.append(make("h2",title),button("Close",close));
+ const header=make("header");header.append(make("h2",title),button("Close",requestClose));
  const body=make("div",undefined,"fxi-body"),status=make("p","Ready.","fxi-status");status.setAttribute("role","status");status.setAttribute("aria-live","polite");
  const tabs=make("nav",undefined,"fxi-tabs");tabs.setAttribute("aria-label","Editor tools");tabs.append(button("Paragraph",()=>paragraph()),button("Find",search),button("Move",()=>moveText()),button("Compare",compare),button("Precise",edit),button("Redact",redact),button("More",()=>processing("ocr")));
  box.append(header,tabs,body,status);modal.append(box);const host=document.querySelector(".fxie-layout");if(!host)throw Error("Open the PDF editor first.");host.classList.add("fxi-docked");host.append(modal);
  const fab=document.getElementById("chatFab");if(fab){fabState={value:fab.style.getPropertyValue("display"),priority:fab.style.getPropertyPriority("display")};fab.style.setProperty("display","none","important")}
- keyTrap=e=>{if(modal&&box.contains(document.activeElement)&&e.key==="Escape"){e.preventDefault();e.stopPropagation();close()}};document.addEventListener("keydown",keyTrap,true);window.dispatchEvent(new Event("resize"));
+ keyTrap=e=>{if(modal&&box.contains(document.activeElement)&&e.key==="Escape"){e.preventDefault();e.stopPropagation();requestClose()}};document.addEventListener("keydown",keyTrap,true);window.dispatchEvent(new Event("resize"));
  header.querySelector("button").focus();return {body,status,box,root:modal};
 }
 function serviceURL(service,path){
@@ -35,7 +38,7 @@ async function request(source,path,operation,params,service="integrity"){
  const response=await fetch(serviceURL(service,path),{method:"POST",body:form,credentials:"omit"});
  if(!response.ok){let error="The engine could not finish ("+response.status+").";try{error=(await response.json()).detail||error}catch{}throw Error(error)}return response;
 }
-function disclosure(body){const detail=make("details");detail.append(make("summary","Processing and privacy"),make("p","Inspect and Apply temporarily upload this PDF to FoxPDF’s processor. Text edits update this document with Undo. Sanitized redaction creates a separate image-only document in the same editor.","fxi-note"));const source=make("a","Engine source and license","fxi-note");source.href="https://github.com/xavieraponteus-source/chisa-game/tree/main/services/foxpdf-integrity";source.target="_blank";source.rel="noopener";detail.append(source);body.append(detail)}
+function disclosure(body){const detail=make("details");detail.append(make("summary","Processing and privacy"),make("p","Opening text editing and saving changes temporarily upload this PDF to FoxPDF’s processor. Text edits update this document with Undo. Sanitized redaction creates a separate image-only document in the same editor.","fxi-note"));const source=make("a","Engine source and license","fxi-note");source.href="https://github.com/xavieraponteus-source/chisa-game/tree/main/services/foxpdf-integrity";source.target="_blank";source.rel="noopener";detail.append(source);body.append(detail)}
 async function inspectLayout(source){
  if(layoutCache&&same(source,layoutCache.source))return layoutCache.promise;
  const entry={source:{name:source.name,bytes:source.bytes.slice()},promise:null};
@@ -54,11 +57,11 @@ function reportView(body,report){
  const pre=make("pre",JSON.stringify(report,null,2));details.append(pre);
  details.append(button("Download verification report",()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:"application/json"}));const a=make("a");a.href=url;a.download="FoxPDF-verification.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),20000)}));body.append(details);
 }
-async function applyResult(source,response,allowFlow=false){
+async function applyResult(source,response,allowFlow=false,minCount=source.count){
  const bytes=new Uint8Array(await response.arrayBuffer());let report={};try{report=JSON.parse(response.headers.get("x-foxpdf-details")||"{}")}catch{}
  const pdf=await PDFLib.PDFDocument.load(bytes.slice()),count=pdf.getPageCount();
  const expected=allowFlow?Number(report.output_page_count):source.count;
- if(count!==expected||count<source.count||count>source.count+10)throw Error("The returned page count could not be verified. Nothing was applied.");
+ if(count!==expected||count<minCount||count>minCount+10)throw Error("The returned page count could not be verified. Nothing was applied.");
  if(!same(source,app.readCurrent()))throw Error("The PDF changed during processing. Your newer edits were kept.");
  if(!window.FoxPDFInteractiveEditor?.commitVerified)throw Error("Refresh FoxPDF to load in-place editing.");
  await window.FoxPDFInteractiveEditor.commitVerified(source,bytes);return report;
@@ -119,37 +122,76 @@ function redact(){
  }catch(e){ui.status.textContent=e.message}finally{run.disabled=false}},true);
  ui.body.append(run,button("Use standard searchable-text redaction instead",()=>{close();app.advanced("redact")}));
 }
+// Serialize verified writes, coalesce typing, and never install an obsolete response.
+function liveWriter({snapshot,process,commit,status,delay=350}){
+ let revision=0,saved=0,timer=null,running=null,stopped=false,suspended=false,error=null;
+ async function drain(){
+  if(running)return running;
+  running=(async()=>{while(!stopped&&!suspended&&saved<revision){const rev=revision,value=snapshot();status("Saving text…");
+   try{const result=await process(value);if(stopped||suspended)return;if(rev!==revision)continue;await commit(result);saved=rev;error=null;status(saved===revision?"Saved to PDF. Keep typing, resize, or drag the text.":"Saving latest text…")}
+   catch(e){error=e;status("Not saved: "+e.message+" Your draft is still here.");throw e}
+  }})().finally(()=>running=null);return running;
+ }
+ return {change(){if(stopped)return;revision++;error=null;clearTimeout(timer);status("Live preview · saving after you pause…");if(!suspended)timer=setTimeout(()=>drain().catch(()=>{}),delay)},pause(){suspended=true;clearTimeout(timer)},resume(){suspended=false},async flush(){if(suspended)throw Error("Finish composing this word before saving.");clearTimeout(timer);await drain();if(error)throw error},stop(){stopped=true;clearTimeout(timer)},get dirty(){return saved<revision}};
+}
 function paragraph(selection=null){
  const source=app.readCurrent();if(!source){app.open();return app.say("Open a PDF, then choose Paragraph edit.")}
- const ui=dialog("Edit and reflow a paragraph");disclosure(ui.body);
- ui.body.append(make("p","Opening original-text editing temporarily sends this PDF to FoxPDF to detect its paragraphs. Repeat selections reuse the detected layout. Your PDF changes only when you Apply; Undo restores the previous version.","fxi-note"));
- const inspect=button("Inspect paragraphs",async()=>{inspect.disabled=true;ui.status.textContent="Identifying paragraph boundaries and nearby objects…";try{
-  if(!same(source,app.readCurrent()))throw Error("The document changed. Reopen this tool.");
+ const ui=dialog("Edit text live");disclosure(ui.body);
+ ui.body.append(make("p","Type on the PDF or here. The preview updates immediately; verified PDF changes save after you pause. Use the size buttons and drag handle to arrange your text. Done finishes the edit.","fxi-note"));
+ const inspect=button("Start editing text",async()=>{inspect.disabled=true;ui.status.textContent="Preparing editable text…";try{
   const info=await inspectLayout(source);if(modal!==ui.root)return;
+  if(!same(source,app.readCurrent()))throw Error("The document changed. Select the text again.");
   if(info.signed)throw Error("Use an unsigned copy before editing a signed PDF.");
-  if(!info.pages.every(p=>Array.isArray(p.paragraphs)))throw Error("The paragraph engine is being upgraded. Refresh FoxPDF shortly and try again.");
-  const page=select(info.pages.map(p=>[String(p.page),"Page "+p.page])),choice=select([]),text=make("textarea");text.rows=8;text.maxLength=10000;
-  const grow=make("input");grow.type="checkbox";grow.checked=true;
-  const fit=make("input");fit.type="checkbox";
-  const flow=make("input");flow.type="checkbox";
-  const tableGrow=make("input");tableGrow.type="checkbox";
-  const styles=make("input");styles.type="checkbox";styles.checked=true;
-  const align=select([["left","Left"],["center","Center"],["right","Right"],["justify","Justify"]]),summary=make("p",undefined,"fxi-note");
+  const page=select(info.pages.map(p=>[String(p.page),"Page "+p.page])),choice=select([]),text=make("textarea");text.rows=4;text.maxLength=10000;
+  const grow=make("input"),fit=make("input"),flow=make("input"),tableGrow=make("input"),styles=make("input");
+  for(const c of [grow,fit,flow,tableGrow,styles])c.type="checkbox";grow.checked=styles.checked=true;
+  const align=select([["left","Left"],["center","Center"],["right","Right"],["justify","Justify"]]);
   const selected=()=>info.pages.find(p=>p.page===Number(page.value))?.paragraphs.find(p=>p.id===choice.value);
-  const show=()=>{const p=selected();text.value=p?.text||"";summary.textContent=p?p.line_count+" original lines · "+p.fonts.join(", ")+" · "+Math.round(p.bbox[2]-p.bbox[0])+" pt wide · up to "+Math.round(p.available_bbox[3]-p.bbox[1])+" pt high with safe growth":"No paragraphs found. Run OCR on an image-only PDF first."};
-  const changed=()=>{choice.replaceChildren();for(const p of info.pages.find(p=>p.page===Number(page.value))?.paragraphs||[]){const o=make("option",(p.editable?"":"Unsupported · ")+p.text.slice(0,140));o.value=p.id;choice.append(o)}show()};page.onchange=changed;choice.onchange=show;page.value=String(selection?.page||app.current()?.page||1);changed();
-  if(selection?.text){const inspectedPage=info.pages.find(p=>p.page===Number(page.value));let matches=inspectedPage?.paragraphs.filter(p=>p.text.includes(selection.text.trim()))||[];
-   if(selection.bbox&&inspectedPage?.rotation===0){const r=selection.bbox;matches=matches.filter(p=>p.bbox[0]<r[2]&&p.bbox[2]>r[0]&&p.bbox[1]<r[3]&&p.bbox[3]>r[1])}
-   if(matches.length===1){choice.value=matches[0].id;show()}}
-  const apply=button("Apply paragraph",async()=>{apply.disabled=true;ui.status.textContent="Wrapping text, saving and checking surrounding content…";try{
-   if(!same(source,app.readCurrent()))throw Error("The document changed. Inspect the current copy again.");
-   const p=selected();if(!p||!p.editable)throw Error("Choose a supported horizontal paragraph. Use Precise text for rotated runs.");
-   if(flow.checked&&tableGrow.checked)throw Error("Choose either continuation pages or table-row growth for this edit.");
-   const response=await request(source,"process","edit_paragraph",{source_sha256:info.source_sha256,page:Number(page.value),paragraph_id:p.id,text:text.value,grow:grow.checked,fit:fit.checked,flow:flow.checked,table_grow:tableGrow.checked,preserve_styles:styles.checked,align:align.value});
-   const report=await applyResult(source,response,flow.checked);ui.status.textContent="Applied. Undo restores this edit."+(report.continuation_pages?.length?" Continued on added pages "+report.continuation_pages.join(", ")+".":"");reportView(ui.body,report);ui.body.append(button("Move edited paragraph",()=>moveText({page:Number(page.value),text:text.value})),button("Edit another paragraph",()=>paragraph()));
-  }catch(e){ui.status.textContent=e.message}finally{apply.disabled=false}},true);
-  ui.body.append(field("Page",page),field("Original paragraph",choice),summary,field("Replacement paragraph",text),field("Alignment",align),field("Preserve mixed formatting",styles),field("Grow into free space below",grow),field("Allow smaller text (minimum 6 pt)",fit),field("Continue overflow on new pages at the end",flow),field("Grow a row in a simple white-background table",tableGrow),button("Move this paragraph",()=>moveText({page:Number(page.value),text:selected()?.text})),make("p","Continuation preserves existing pages. Table growth keeps the grid and other cell text, moving later rows only when space is clear; merged, decorated or colored tables are rejected.","fxi-note"),apply);
-  inspect.remove();ui.status.textContent="Paragraphs ready. Choose a paragraph and review the replacement before creating a copy.";
+  page.value=String(selection?.page||app.current()?.page||1);
+  for(const p of info.pages.find(p=>p.page===Number(page.value))?.paragraphs||[]){const o=make("option",(p.editable?"":"Unsupported · ")+p.text.slice(0,140));o.value=p.id;choice.append(o)}
+  if(selection?.text){let matches=info.pages.find(p=>p.page===Number(page.value))?.paragraphs.filter(p=>p.text.includes(selection.text.trim()))||[];if(selection.bbox)matches=matches.filter(p=>p.bbox[0]<selection.bbox[2]&&p.bbox[2]>selection.bbox[0]&&p.bbox[1]<selection.bbox[3]&&p.bbox[3]>selection.bbox[1]);if(matches.length===1)choice.value=matches[0].id}
+  const editingPage=Number(page.value);
+  if(info.pages.find(p=>p.page===editingPage)?.rotation)throw Error("Use Precise text editing for rotated pages.");
+  const p=selected();if(!p?.editable)throw Error("Select a supported horizontal paragraph. Precise text supports rotated runs.");
+  text.value=p.text;
+  // The clean canvas contains the real PDF background with only this paragraph removed.
+  // No white patch is used, including on colored, patterned, or transparent pages.
+  const clean=await request(source,"process","edit_paragraph",{source_sha256:info.source_sha256,page:editingPage,paragraph_id:p.id,text:""});
+  const lib=await window.FoxPDFInteractiveEditor.pdfjs(),task=await lib.getDocument({data:new Uint8Array(await clean.arrayBuffer())}).promise;
+  const cleanPage=await task.getPage(Number(page.value)),viewport=cleanPage.getViewport({scale:1.5}),canvas=make("canvas",undefined,"fxi-live-background");canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+  await cleanPage.render({canvasContext:canvas.getContext("2d"),viewport}).promise;await task.destroy();
+  if(modal!==ui.root)return;
+  let expected=source,fontScale=1,position=null,composing=false,drag=null;
+  const preview=make("div",p.text,"fxi-live-text");preview.contentEditable="plaintext-only";preview.setAttribute("role","textbox");preview.setAttribute("aria-label","Edit paragraph directly on PDF");preview.setAttribute("aria-multiline","true");preview.spellcheck=false;
+  const tools=make("div",undefined,"fxi-live-toolbar"),sizeLabel=make("span","100%");
+  const params=()=>({source_sha256:info.source_sha256,page:editingPage,paragraph_id:p.id,text:text.value,font_scale:fontScale,position,grow:grow.checked,fit:fit.checked,flow:flow.checked,table_grow:tableGrow.checked,preserve_styles:styles.checked,align:align.value});
+  const writer=liveWriter({snapshot:params,process:async value=>{if(!same(expected,app.readCurrent()))throw Error("The PDF changed elsewhere. Finish this draft or select the text again.");if(value.flow&&value.table_grow)throw Error("Choose continuation pages or table growth, rather than both.");return {response:await request(source,"process","edit_paragraph",value),flow:value.flow}},commit:async result=>{await applyResult(expected,result.response,result.flow,source.count);expected=app.readCurrent()},status:value=>ui.status.textContent=value});
+  function positionPreview(){const surface=window.FoxPDFInteractiveEditor.pageSurface(editingPage);if(!surface)return;const scale=surface.scale,at=position||{x:p.bbox[0],y:p.bbox[1]};
+   Object.assign(preview.style,{left:at.x*scale+"px",top:at.y*scale+"px",width:(p.bbox[2]-p.bbox[0])*Math.max(1,fontScale)*scale+"px",fontSize:(p.font_size||12)*fontScale*scale+"px",textAlign:align.value});
+   Object.assign(tools.style,{left:at.x*scale+"px",top:Math.max(0,at.y*scale-42)+"px"});
+   if(canvas.parentNode!==surface.sheet)surface.sheet.append(canvas,preview,tools);
+  }
+  preview.style.fontFamily=/Times|Serif|tiro/i.test(p.fonts.join(" "))?'"Times New Roman",serif':/Courier|Mono/i.test(p.fonts.join(" "))?'monospace':'Arial,sans-serif';preview.style.fontWeight=p.bold?"bold":"normal";preview.style.fontStyle=p.italic?"italic":"normal";preview.style.color="#"+(p.color||0).toString(16).padStart(6,"0");
+  function changed(){if(preview.textContent!==text.value)preview.textContent=text.value;positionPreview();writer.change()}
+  const resize=factor=>{fontScale=Math.max(Math.max(.25,6/(p.font_size||12)),Math.min(4,Math.round(fontScale*factor*100)/100));sizeLabel.textContent=Math.round(fontScale*100)+"%";changed()};
+  const grip=button("↔ Move",()=>{});grip.setAttribute("aria-label","Drag paragraph to move it");
+  tools.append(grip,button("A−",()=>resize(1/1.1)),sizeLabel,button("A+",()=>resize(1.1)),button("Done",()=>finish()));
+  tools.onpointerdown=e=>e.stopPropagation();tools.onclick=e=>e.stopPropagation();preview.onclick=e=>e.stopPropagation();preview.onpointerdown=e=>e.stopPropagation();
+  grip.onpointerdown=e=>{if(e.pointerType==="mouse"&&e.button!==0)return;e.preventDefault();e.stopPropagation();const surface=window.FoxPDFInteractiveEditor.pageSurface(editingPage);if(!surface)return;drag={id:e.pointerId,x:e.clientX,y:e.clientY,scale:surface.scale,at:{...(position||{x:p.bbox[0],y:p.bbox[1]})},prior:position};grip.setPointerCapture(e.pointerId)};
+  grip.onpointermove=e=>{if(drag?.id!==e.pointerId)return;e.preventDefault();position={x:drag.at.x+(e.clientX-drag.x)/drag.scale,y:drag.at.y+(e.clientY-drag.y)/drag.scale};positionPreview()};
+  grip.onpointerup=e=>{if(drag?.id!==e.pointerId)return;e.preventDefault();drag=null;writer.change()};
+  grip.onpointercancel=()=>{if(!drag)return;position=drag.prior;drag=null;positionPreview()};grip.onlostpointercapture=()=>{if(drag){position=drag.prior;drag=null;positionPreview()}};
+  text.oninput=changed;preview.oninput=()=>{text.value=preview.innerText.replace(/\r/g,"");if(text.value.length>10000){ui.status.textContent="Keep this paragraph under 10,000 characters.";return}changed()};
+  for(const control of [text,preview]){control.oncompositionstart=()=>{composing=true;writer.pause()};control.oncompositionend=()=>{composing=false;writer.resume();changed()}}
+  for(const control of [grow,fit,flow,tableGrow,styles,align])control.onchange=changed;
+  const observer=new MutationObserver(()=>{const surface=window.FoxPDFInteractiveEditor.pageSurface(editingPage);if(surface&&canvas.parentNode!==surface.sheet)positionPreview()});observer.observe(document.querySelector(".fxie-layout"),{childList:true,subtree:true});
+  const cleanup=()=>{writer.stop();observer.disconnect();window.removeEventListener("resize",positionPreview);canvas.remove();preview.remove();tools.remove();if(liveEdit?.writer===writer)liveEdit=null};
+  async function finish(){try{await writer.flush();cleanup();close()}catch(e){ui.status.textContent="Not saved: "+e.message+" Your draft is still here."}}
+  liveEdit={writer,flush:()=>writer.flush(),cleanup};clearHandle=()=>{cleanup();clearHandle=null};window.addEventListener("resize",positionPreview);
+  const switchParagraph=async()=>{try{await writer.flush();const next={page:Number(page.value),text:choice.selectedOptions[0]?.textContent};cleanup();paragraph(next)}catch(e){ui.status.textContent=e.message}};page.onchange=choice.onchange=switchParagraph;
+  const options=make("details");options.append(make("summary","Paragraph layout options"),field("Alignment",align),field("Preserve mixed formatting",styles),field("Grow into free space below",grow),field("Allow smaller text (minimum 6 pt)",fit),field("Continue overflow on new pages",flow),field("Grow a simple table row",tableGrow));
+  ui.body.append(field("Page",page),field("Original paragraph",choice),field("Replacement paragraph",text),make("p","Size and movement controls are above the selected text on the PDF.","fxi-note"),options,button("Done editing",finish,true),button("Retry saving",()=>writer.flush().catch(e=>ui.status.textContent=e.message)),button("Discard unsaved draft",()=>{cleanup();close()}));
+  inspect.remove();positionPreview();ui.status.textContent="Ready. Type directly on the PDF; changes appear immediately.";preview.focus();
  }catch(e){ui.status.textContent=e.message;inspect.disabled=false}},true);ui.body.append(inspect);
  if(selection?.text||(layoutCache&&same(source,layoutCache.source)))inspect.click();
 }
@@ -216,7 +258,8 @@ function moveText(selection=null){
   }
   const apply=button("Move to destination",async()=>{apply.disabled=true;try{await commit(Number(target.value),Number(x.value),Number(y.value))}catch(e){ui.status.textContent=e.message}finally{apply.disabled=false}},true);
   const show=button("Show drag handle on PDF",async()=>{show.disabled=true;try{
-   clearHandle?.();const p=selected();if(!p?.editable)throw Error("Choose a supported horizontal paragraph.");
+   clearHandle?.();if(info.pages.find(p=>p.page===editingPage)?.rotation)throw Error("Use Precise text editing for rotated pages.");
+  const p=selected();if(!p?.editable)throw Error("Choose a supported horizontal paragraph.");
    await app.setPage(Number(page.value));await new Promise(resolve=>setTimeout(resolve,300));
    if(modal!==ui.root)return;
    const api=window.FoxPDFInteractiveEditor,surface=api.pageSurface(Number(page.value));if(!surface)throw Error("Wait for the page to render, then try again.");
@@ -271,7 +314,15 @@ function compare(){
  }catch(e){ui.status.textContent=e.message}finally{run.disabled=false}},true);
  ui.body.append(field("Compare current PDF with",choice),file,run,results);
 }
-window.FoxPDFIntegrity={version:"1.9",open:type=>type==="compare"?compare():type==="search"?search():type==="move"?moveText():type==="redact"?redact():type==="paragraph"?paragraph():["ocr","compress","convert","protect"].includes(type)?processing(type==="protect"?"encrypt":type):edit(),editSelection:selection=>paragraph(selection),sameSource:same};
+let replayDownload=false;
+document.addEventListener("click",async event=>{
+ const target=event.target.closest?.("#fxieSave,#download,#fxiePrint,#fxieShare,#fxieUndo,#fxieRedo,.fxie-topbar button,.fxie-editorbar button,.fxie-left button");
+ if(!target||!liveEdit||replayDownload)return;
+ event.preventDefault();event.stopImmediatePropagation();
+ try{if(["fxieSave","download","fxiePrint","fxieShare"].includes(target.id))await liveEdit.flush();else await finishLive();replayDownload=true;target.click()}catch(e){app.say("Finish saving your text first: "+e.message)}finally{replayDownload=false}
+},true);
+window.addEventListener("beforeunload",event=>{if(liveEdit?.writer.dirty){event.preventDefault();event.returnValue=""}});
+window.FoxPDFIntegrity={version:"2.0",open:async type=>{try{await finishLive();return type==="compare"?compare():type==="search"?search():type==="move"?moveText():type==="redact"?redact():type==="paragraph"?paragraph():["ocr","compress","convert","protect"].includes(type)?processing(type==="protect"?"encrypt":type):edit()}catch(e){app.say(e.message)}},editSelection:async selection=>{try{await finishLive();paragraph(selection)}catch(e){app.say(e.message)}},sameSource:same};
 const bar=document.querySelector(".fxie-barleft");if(bar){bar.append(button("Paragraph edit",paragraph),button("Precise text",edit),button("Redact & sanitize",redact),button("PDF tools",()=>processing("ocr")))}
 const convert=document.getElementById("fxieConvert");if(convert)convert.onclick=()=>processing("convert");
 const advanced=document.getElementById("fxieAdvanced");if(advanced)advanced.onclick=()=>processing("ocr");
