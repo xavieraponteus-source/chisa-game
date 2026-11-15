@@ -601,52 +601,18 @@ function showInline(){
  field.focus({preventScroll:true});field.setSelectionRange(field.value.length,field.value.length);
 }
 async function chooseText(text,button,pageNum,box){
- if(window.FoxPDFIntegrity?.editSelection){closeInline();window.FoxPDFIntegrity.editSelection({text,page:pageNum});return;}
- closeInline();view.querySelectorAll(".fxie-textregion").forEach(a=>a.classList.remove("selected"));button.classList.add("selected");
- selected={text,page:pageNum,box,button,revision:++localRevision,source:app.readCurrent()};
- $("fxieReplaceBox").hidden=false;$("fxieInsertBox").hidden=true;
- $("fxieParagraph").replaceChildren(new Option("Selected text segment · local editing","local"));
- $("fxieReplacement").value=text;
- const font=(box.fontFamily||"").toLowerCase();const guess=font.includes("courier")||font.includes("mono")?"Courier":font.includes("times")||font.includes("serif")?"TimesRoman":"Helvetica";
- $("fxieFont").value=guess;$("fxieSize").value=String(Math.max(5,Math.min(80,Math.round(box.height/box.scale))));
- const pixel=samplePixels(box);if(pixel.ink)$("fxieColor").value=cssColor(pixel.ink);
- showInline();
- say(pixel.uniform?"Editing locally—no upload or permission popup. Press Ctrl+Enter or Apply to save.":"Editing locally. This area has a complex background; check the appearance after applying.");
+ closeInline();
+ if(!window.FoxPDFIntegrity?.editSelection){say("The original-text editor is still loading. Please wait or refresh FoxPDF before editing.",true);return;}
+ const scale=Number(box?.scale)||1;
+ const bbox=box?[box.x/scale,box.top/scale,(box.x+box.width)/scale,(box.top+box.height)/scale]:null;
+ window.FoxPDFIntegrity.editSelection({text,page:pageNum,bbox});
 }
 $("fxieParagraph").onchange=()=>{if(selected)$("fxieReplacement").value=selected.text};
 $("fxieReplacement").oninput=()=>{const textarea=inlineEditor?.querySelector("textarea");if(textarea&&textarea.value!==$("fxieReplacement").value)textarea.value=$("fxieReplacement").value};
 
 async function applyLocal(){
- const state=selected;
- if(!state?.box)return say("Click the text you want to edit first.",true);
- const value=(inlineEditor?.querySelector("textarea")?.value??$("fxieReplacement").value).replace(/\r/g,"");
- const delta=state.moveDelta||{x:0,y:0};
- const moved=Math.abs(delta.x)>1||Math.abs(delta.y)>1;
- if(value===state.text&&!moved){closeInline();$("fxieReplaceBox").hidden=true;selected=null;return say("No changes made.")}
- if(value.length>800)return say("For long text blocks, use Advanced reflow. Local editing allows 800 characters.",true);
- if(!rendered)return say("Page preview isn't ready.",true);
- if(state.page!==app.current()?.page)return say("The selected page changed. Select the text again.",true);
- const box=state.box,colors=samplePixels(box),scale=box.scale;
- const fontName=$("fxieFont").value,size=Number($("fxieSize").value),hex=$("fxieColor").value;
- if(!Number.isFinite(size)||size<5||size>80)return say("Choose a font size between 5 and 80.",true);
- if(!colors.uniform)say("Complex background detected: a local visual edit may look imperfect. Review before sharing.",true);
- const source=app.readCurrent();
- if(!source)return say("Please reopen your PDF.",true);
- if(!state.source||source.name!==state.source.name||!equalBytes(source.bytes,state.source.bytes))return say("The PDF changed. Select the text again before editing.",true);
- const sourceX=Math.max(0,box.x/scale),sourceY=rendered.originalHeight-box.baseline/scale;
- const x=Math.max(0,Math.min(rendered.originalWidth-6,sourceX+delta.x/scale));
- const y=Math.max(0,Math.min(rendered.originalHeight-size*.25,sourceY-delta.y/scale));
- const width=Math.max(18,Math.min(rendered.originalWidth-x-6,Math.max(box.width/scale*1.3,Math.max(value.length,state.text.length)*size*.6+20)));
- const session={page:state.page,name:source.name,baseBytes:source.bytes.slice(),text:value,size,fontName,hex,
-  fontFamily:box.fontFamily||"Arial",x,y,width,
-  cover:{box:{...box},background:colors.background.slice()}};
- const applied=await mutate(async doc=>{
-  const live=app.readCurrent();
-  if(!live||live.name!==source.name||!equalBytes(live.bytes,source.bytes))throw Error("The PDF changed before editing. Select the text again.");
-  await paintMovableText(doc,session);
- },
-  colors.uniform?"Text updated. Drag its outline to move it, then Save PDF.":"Text updated. Review the background and use the blue outline to move it.");
- if(applied){closeInline();$("fxieReplaceBox").hidden=true;selected=null;rememberMovable(session)}
+ if(!selected)return say("Select original text on the PDF to open verified editing.",true);
+ return chooseText(selected.text,selected.button,selected.page,selected.box);
 }
 $("fxieApply").onclick=()=>applyLocal();
 
@@ -1094,7 +1060,7 @@ async function findReplace(onlyCurrent){
  },"Replaced "+targets.length+" visible occurrence(s). Review the result and save.");
  if(ok){await findScan();say("Replacements applied. Original text may still be searchable; not secure redaction.")}
 }
-bind("fxieSearch",()=>{if(window.FoxPDFIntegrity)return window.FoxPDFIntegrity.open("search");findBox.hidden=!findBox.hidden;if(!findBox.hidden){findEl("fxFindWord").focus();if(fxieFind.query)findScan()}else findRefreshVisible()});
+bind("fxieSearch",()=>{if(window.FoxPDFIntegrity)return window.FoxPDFIntegrity.open("search");say("The native text tools are still loading. Please wait or refresh FoxPDF.",true)});
 findEl("fxFindClose").onclick=()=>{findBox.hidden=true;findRefreshVisible()};
 findEl("fxFindRun").onclick=findScan;
 findEl("fxFindPrevious").onclick=()=>findSelect(fxieFind.index-1);
@@ -1740,14 +1706,7 @@ async function setSplitView(pageNumber,refresh=false){
     button.addEventListener("click",async e=>{
      if(splitEditMode!=="edit")return;
      e.preventDefault();e.stopPropagation();
-     const replacement=await rightTextInput(item.str,{x:mat[4],y:mat[5]-size},"Edit text on page "+n);
-     if(replacement===null||replacement===item.str)return;
-     await rightMutate(async(pdf,pg)=>{
-      const font=await fxieEmbedSelectedFont(pdf),sz=Math.max(6,size/scale);
-      const px=mat[4]/scale,py=pg.getHeight()-mat[5]/scale;
-      pg.drawRectangle({x:Math.max(0,px-1),y:Math.max(0,py-2),width:Math.min(pg.getWidth()-px,Math.max(item.width/1,sz*.8)+4),height:sz+5,color:PDFLib.rgb(1,1,1)});
-      if(replacement.trim())pg.drawText(replacement,{x:px,y:py,size:sz,font,color:color(),maxWidth:Math.max(10,pg.getWidth()-px-4)});
-     },"Edited right-page text. Review the PDF before saving.");
+     await chooseText(item.str,button,n,{x:mat[4],top:mat[5]-size,width:Math.max(9,Math.abs(item.width)*scale),height:size,baseline:mat[5],scale});
     });
     hitLayer.append(button);
    }

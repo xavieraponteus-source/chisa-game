@@ -2,7 +2,7 @@
 import difflib,math,re
 import pymupdf as fitz
 from PIL import Image,ImageChops,ImageDraw
-from engine import EngineError,open_pdf,sha,norm,resolve_font,field_state,runs,ensure_visible_text
+from engine import EngineError,open_pdf,sha,norm,resolve_font,field_state,runs,ensure_visible_text,original_ink_bounds
 
 def unchanged_except(before,after,rects,matrix):
     if (before.width,before.height)!=(after.width,after.height):return False
@@ -74,9 +74,10 @@ def replace_text(data,params):
                 size*=rect.width/width
                 if size<6:raise EngineError('Replacement would be smaller than 6 pt. Edit the paragraph instead.')
             if pn not in before:before[pn]=page.get_pixmap(alpha=False,annots=True);matrices[pn]=fitz.Matrix(page.rotation_matrix)
-            regions.setdefault(pn,[]).append(rect);plans.append((pn,s,rect,text,size,buffer,name))
+            regions.setdefault(pn,[]).append(original_ink_bounds(page,identifier,font));plans.append((pn,s,rect,text,size,buffer,name))
         for pn,rects in regions.items():
-            for rect in rects:doc[pn].add_redact_annot(rect,fill=False,cross_out=False)
+            for page_no,s,rect,*_ in plans:
+                if page_no==pn:doc[pn].add_redact_annot(rect,fill=False,cross_out=False)
             doc[pn].apply_redactions(images=0,graphics=0,text=0)
         for pn,s,rect,text,size,buffer,name in plans:
             if buffer:doc[pn].insert_font(fontname=name,fontbuffer=buffer)
@@ -117,6 +118,11 @@ def move_text(data,params):
             if any((region&r).get_area()>.1 for r in obstacles):raise EngineError('The text would overlap another text block, field, link or annotation.')
         before={n:doc[n].get_pixmap(alpha=False,annots=True) for n in set([pn,dest])};fields=field_state(doc)
         spans=[s for l in p['_lines'] for s in l['spans']];fonts={s['font']:resolve_font(doc,source,s['font']) for s in spans}
+        old_ink=fitz.Rect(old)
+        for identifier,s,_ in runs(source):
+            if identifier in members:old_ink|=original_ink_bounds(source,identifier,fonts[s['font']][0])
+        new_ink=old_ink+(x-old.x0,y-old.y0,x-old.x0,y-old.y0)
+        if not target.rect.contains(new_ink):raise EngineError('Move the text farther inside the page so italic overhangs are not clipped.')
         for s in spans:source.add_redact_annot(s['bbox'],fill=False,cross_out=False)
         source.apply_redactions(images=0,graphics=0,text=0)
         for font,buffer,name in fonts.values():
@@ -126,7 +132,7 @@ def move_text(data,params):
         with fitz.open(stream=output,filetype='pdf') as check:
             if field_state(check)!=fields or len(check)!=len(doc):raise EngineError('Page or form verification failed.')
             for n in before:
-                allowed=([old] if n==pn else [])+([new] if n==dest else [])
+                allowed=([old_ink] if n==pn else [])+([new_ink] if n==dest else [])
                 if not unchanged_except(before[n],check[n].get_pixmap(alpha=False,annots=True),allowed,fitz.Matrix(1,0,0,1,0,0)):raise EngineError('Rendering changed outside the moved text. Nothing was applied.')
             if norm(check[dest].get_textbox(new+(-1,-1,1,1)))!=norm(p['text']):raise EngineError('The moved text could not be verified.')
         return output,{'operation':'move_text','source_page':pn+1,'target_page':dest+1,'bbox':list(new),'fonts_preserved':True,'surrounding_pixels_unchanged':True,'forms_preserved':True,'source_sha256':sha(data),'output_sha256':sha(output)}
