@@ -4,7 +4,7 @@ const ready=fn=>document.readyState==="loading"?document.addEventListener("DOMCo
 ready(()=>{
 const app=window.FoxPDFBridge;if(!app)return;
 const make=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};
-const css=document.createElement("link");css.rel="stylesheet";css.href="/fox-assets/integrity-tools-v1.css?v=1.5";document.head.append(css);
+const css=document.createElement("link");css.rel="stylesheet";css.href="/fox-assets/integrity-tools-v1.css?v=1.6";document.head.append(css);
 let modal=null,lastFocus=null,keyTrap=null,fabState=null,clearHandle=null;
 const same=(a,b)=>!!a&&!!b&&a.name===b.name&&a.bytes.length===b.bytes.length&&a.bytes.every((v,i)=>v===b.bytes[i]);
 function close(){clearHandle?.();if(keyTrap)document.removeEventListener("keydown",keyTrap,true);keyTrap=null;const fab=document.getElementById("chatFab");if(fabState&&fab){if(fabState.value)fab.style.setProperty("display",fabState.value,fabState.priority);else fab.style.removeProperty("display")}fabState=null,clearHandle=null;modal?.parentElement?.classList.remove("fxi-docked");modal?.remove();modal=null;lastFocus?.focus?.();window.dispatchEvent(new Event("resize"))}
@@ -197,7 +197,7 @@ function moveText(selection=null){
    const p=selected();if(!p)throw Error("Choose a paragraph first.");
    ui.status.textContent="Moving original text and checking the saved PDF…";
    const response=await request(source,"process","move_text",{source_sha256:info.source_sha256,page:Number(page.value),paragraph_id:p.id,target_page:pn,x:left,y:top});
-   const report=await applyResult(source,response);clearHandle?.();await app.setPage(pn);ui.status.textContent="Text moved to page "+pn+". Undo restores its original position.";reportView(ui.body,report);ui.body.append(button("Move another paragraph",()=>moveText()));
+   const report=await applyResult(source,response);clearHandle?.();if(window.FoxPDFInteractiveEditor.otherPage()!==pn)await app.setPage(pn);ui.status.textContent="Text moved to page "+pn+". Undo restores its original position.";reportView(ui.body,report);ui.body.append(button("Move another paragraph",()=>moveText()));
   }
   const apply=button("Move to destination",async()=>{apply.disabled=true;try{await commit(Number(target.value),Number(x.value),Number(y.value))}catch(e){ui.status.textContent=e.message}finally{apply.disabled=false}},true);
   const show=button("Show drag handle on PDF",async()=>{show.disabled=true;try{
@@ -265,5 +265,7 @@ const findButton=document.querySelector(".fxie-find-open");if(findButton){const 
 if(bar)bar.append(button("Move text",()=>moveText()),button("Compare PDFs",compare));
 const selectedBox=document.getElementById("fxieReplaceBox");if(selectedBox)selectedBox.append(button("Precise original-text editor",edit));
 if(selectedBox)selectedBox.append(button("Reflow whole paragraph",paragraph));
+const footer=document.querySelector(".footer");if(footer)footer.textContent="FoxPDF Studio · Built for Xavier's Apps · Files stay in your browser unless you run a tool that uses FoxPDF processing.";
+new MutationObserver(()=>{if(modal&&!document.body.classList.contains("fx-mode-editor"))close()}).observe(document.body,{attributes:true,attributeFilter:["class"]});
 });
 })();

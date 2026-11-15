@@ -764,7 +764,7 @@ function showMovableInk(sheet,pageOverride,scaleOverride,dimensions){
  frame.addEventListener("pointerdown",e=>{
   if(state.busy)return;
   if(e.pointerType==="mouse"&&e.button!==0)return;
-  if(e.target.closest(".fxie-ink-control:not(.fxie-ink-move)"))return;
+  if(e.target.closest(".fxie-ink-control:not(.fxie-ink-move):not(.fxie-ink-grip)"))return;
   const type=e.target.closest(".fxie-ink-corner")?"free":e.target.closest(".fxie-ink-width")?"width":e.target.closest(".fxie-ink-height")?"height":"move";
   e.preventDefault();e.stopPropagation();
   interaction={id:e.pointerId,type,clientX:e.clientX,clientY:e.clientY,rect:{...state.box}};
@@ -792,7 +792,7 @@ function showMovableInk(sheet,pageOverride,scaleOverride,dimensions){
    if(destination.getRotation().angle%360!==0)throw Error("Move between rotated pages isn't supported");
    const targetSurface=targetPage===splitPage?splitPane?.querySelector(".fxie-right-edit-sheet"):$("fxieSheetWrap").querySelector(".fxie-sheet");
    const targetScale=targetPage===splitPage?Number(targetSurface?.dataset.imageScale)||sc:rendered.scale;
-   let x=oldBox.x,y=height-oldBox.height-oldBox.y;
+   let x=oldBox.x,y=height-(oldHeight||h)+oldBox.y;
    if(targetSurface&&clientX!==null&&clientY!==null){
     const rect=targetSurface.getBoundingClientRect();
     const px=(clientX-rect.left)*targetSurface.clientWidth/Math.max(1,rect.width),py=(clientY-rect.top)*targetSurface.clientHeight/Math.max(1,rect.height);
@@ -1705,7 +1705,7 @@ async function setSplitView(pageNumber,refresh=false){
     const original=inkRect(points,thickness,width,height);
     const state={name:strokeBefore.name,page:n,pageWidth:width,pageHeight:height,
      baseBytes:strokeBefore.bytes.slice(),latestBytes:null,points,original,box:{...original},
-     thickness,hex:$("#fxieColor")?.value||"#172846",busy:false};
+     thickness,hex:$("fxieColor")?.value||"#172846",busy:false};
     const ok=await mutate(pdf=>paintInkSession(pdf,state),"Drawing added to right page "+n+". Drag the selection to the other page.");
     if(ok){
      inkSession=state;state.latestBytes=app.readCurrent()?.bytes.slice()||null;
