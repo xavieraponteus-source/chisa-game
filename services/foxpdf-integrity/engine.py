@@ -41,6 +41,13 @@ def runs(page):
                 if span.get("text", "").strip():
                     yield f"{bi}:{li}:{si}", span, line
 
+def ensure_visible_text(page,rect):
+    # OCR search layers are usually invisible. Rewriting them cannot edit the scanned image.
+    for trace in page.get_texttrace():
+        if (trace.get('type')==3 or trace.get('opacity',1)<.01) and (fitz.Rect(rect)&fitz.Rect(trace['bbox'])).get_area()>.1:
+            raise EngineError("This is hidden/OCR text. Recognition makes a scan searchable; native text editing cannot rewrite its underlying image. Use redaction or rebuild the text area instead.")
+
+
 def inspect_pdf(data):
     from layout import inspect_paragraphs
     with open_pdf(data) as doc:
@@ -121,6 +128,7 @@ def edit_run(data, params):
             raise EngineError("The selected text run is no longer available.")
         span, line = match
         rect = fitz.Rect(span["bbox"])
+        ensure_visible_text(page,rect)
         for annot in page.annots() or []:
             if annot.type[0] == fitz.PDF_ANNOT_REDACT:
                 raise EngineError("Apply or remove existing redaction marks before editing this page.")

@@ -69,5 +69,13 @@ class OperationsTests(unittest.TestCase):
     def test_invalid_region_is_rejected(self):
         for rect in [[-1,0,10,10],[10,10,10,20],[0,0,9999,9999]]:
             with self.assertRaises(EngineError):redact_image_copy(fixture(),{'terms':[],'rectangles':[{'page':1,'bbox':rect}]})
+    def test_hidden_ocr_text_is_searchable_but_all_native_edit_paths_reject_it(self):
+        from engine import edit_run
+        from layout import edit_paragraph
+        d=fitz.open();p=d.new_page();p.insert_text((30,50),'Hidden OCR text',render_mode=3);d.new_page();b=d.tobytes();d.close()
+        info=inspect_pdf(b);p=info['pages'][0]['paragraphs'][0];base={'source_sha256':sha(b),'page':1,'paragraph_id':p['id'],'text':'Updated OCR text'}
+        self.assertEqual(search_pdf(b,{'query':'OCR'})['total'],1)
+        for fn,params in [(edit_run,{**base,'run_id':info['pages'][0]['runs'][0]['id']}),(edit_paragraph,base),(replace_text,{**base,'query':'OCR','replacement':'new','all':True}),(move_text,{**base,'target_page':2,'x':40,'y':100})]:
+            with self.assertRaisesRegex(EngineError,'hidden/OCR'):fn(b,params)
 
 if __name__=='__main__':unittest.main()
