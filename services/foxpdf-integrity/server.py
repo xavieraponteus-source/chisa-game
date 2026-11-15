@@ -9,7 +9,7 @@ lock = threading.Lock()
 
 @app.get("/health")
 def health():
-    return {"ok":True,"engine":"FoxPDF Integrity","version":"1.1","stateless":True}
+    return {"ok":True,"engine":"FoxPDF Integrity","version":"1.2","stateless":True}
 
 def authorize(token):
     expected = os.environ.get("FOXPDF_API_TOKEN", "")

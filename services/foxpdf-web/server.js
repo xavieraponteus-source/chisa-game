@@ -66,7 +66,7 @@ async function foxLiveAsset(req,url){
  if(req.method!=='GET'&&req.method!=='HEAD')return new Response('Method not allowed',{status:405});
  const mime=name.endsWith('.js')?'text/javascript':'text/css';
  try{
-  const assetRef=name==='interactive-editor-v6.js'?'909311fe07bc7f9ec6c4cdf9a24cb4c036905df3':'main';
+  const assetRef=name==='interactive-editor-v6.js'?(Bun.env.RAILWAY_GIT_COMMIT_SHA||'main'):'main';
   const uri='https://raw.githubusercontent.com/xavieraponteus-source/chisa-game/'+assetRef+'/assets/'+(name.startsWith('admin/')?'':'foxpdf/')+name+'?v='+encodeURIComponent(url.searchParams.get('v')||'11.0');
   const upstream=await fetch(uri,{signal:AbortSignal.timeout(12000)});
   if(!upstream.ok)return new Response('Asset temporarily unavailable',{status:502});
@@ -238,7 +238,7 @@ async function v3Admin(req,url){
 
 const v3Hub=hubPage.replace('<style>','<style>.loader{display:none!important}').replace('href="/pdf"','href="https://xavier-is-working.com/pdf"').replace('</main>','<div style="text-align:center;margin:18px auto;font:12px system-ui"><a style="color:#dbb6df;text-decoration:underline" href="https://foxpdf-studio-web-production.up.railway.app/admin">Admin login</a></div></main>').replace('</body>','<script defer data-section="hub" src="'+V3_ASSETS+'tracker-v3.js?v=3.2"></script></body>');
 const v3PdfBase=page.replace("interactive-editor-v6.js?v=13.1","interactive-editor-v6.js?v=18.7").replace("interactive-editor-v6.css?v=13.1","interactive-editor-v6.css?v=18.2").replace("gold-dashboard-v4.js?v=13.1","gold-dashboard-v4.js?v=18.0").replace("gold-dashboard-v4.css?v=13.0","gold-dashboard-v4.css?v=18.0").replace('</body>','<script defer data-section="pdf" src="'+V3_ASSETS+'tracker-v3.js?v=3.2"></script></body>');
-const v3Pdf=v3PdfBase.replace(/interactive-editor-v6.js\?v=[0-9.]+/g,"interactive-editor-v6.js?v=19.1").replace(/task-picker-v13.js\?v=[0-9.]+/g,"task-picker-v13.js?v=19.1").replace("</body>",'<script defer src="/fox-assets/integrity-tools-v1.js?v=1.1"></script></body>');
+const v3Pdf=v3PdfBase.replace(/interactive-editor-v6.js\?v=[0-9.]+/g,"interactive-editor-v6.js?v=20.0").replace(/task-picker-v13.js\?v=[0-9.]+/g,"task-picker-v13.js?v=20.0").replace("</body>",'<script defer src="/fox-assets/integrity-tools-v1.js?v=1.2"></script></body>');
 
 
 async function foxIntegrityProxy(req){

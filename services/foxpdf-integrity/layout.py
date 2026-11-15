@@ -100,8 +100,11 @@ def styled_replacement(old, styles, text, preserve=True):
     return mapped
 
 
-def edit_paragraph(data, params):
+def edit_paragraph(data, params, region_override=None):
     if params.get("source_sha256")!=sha(data):raise EngineError("The document changed. Inspect the current copy again.")
+    if params.get("table_grow"):
+        from tables import edit_growing_table
+        return edit_growing_table(data,params)
     text=params.get("text","")
     if not isinstance(text,str) or not text.strip() or len(text)>10000:raise EngineError("Enter a paragraph of 1 to 10,000 characters.")
     text=text.replace("\r\n","\n").replace("\r","\n").replace("\t","    ")
@@ -120,13 +123,16 @@ def edit_paragraph(data, params):
         if any(a.type[0]==fitz.PDF_ANNOT_REDACT for a in (page.annots() or [])):
             raise EngineError("Apply or remove existing redaction marks first.")
         region=safe_region(page,p,bool(params.get("grow")))
+        if region_override is not None:region=fitz.Rect(region_override)
         styles=styled_replacement(p["text"],p["_styles"],text,params.get("preserve_styles",True))
         fonts={}
         for s in styles:
             if s["font"] not in fonts:fonts[s["font"]]=resolve_font(doc,page,s["font"])
         if any(not fonts[s["font"]][0].has_glyph(ord(c)) for c,s in zip(text,styles) if not c.isspace()):
             raise EngineError("An original font lacks replacement characters. No edited copy was created.")
-        def layout(scale):
+        page_size=page.rect*page.derotation_matrix
+        continuation=fitz.Rect(region.x0,54,region.x1,page_size.y1-54)
+        def layout(scale,flow=False):
             units=[]
             for match in re.finditer(r"\n|[^\S\n]+|[^\s]+",text):
                 segment=[(c,styles[i]) for i,c in enumerate(text[match.start():match.end()],match.start())]
@@ -143,19 +149,22 @@ def edit_paragraph(data, params):
                 if not current and unit[0][0].isspace():continue
                 current.extend(unit);width+=measure
             if current:rows.append((current,width,True))
-            placed=[];y=region.y0
+            placed=[];y=region.y0;part=0;area=region
             for row_index,(row,width,hard) in enumerate(rows):
                 if not row:y+=max(s["size"] for s in styles)*scale*1.25;continue
                 ascent=max((s.get("ascender",fonts[s["font"]][0].ascender)*s["size"]-s.get("_rise",0))*scale for _,s in row)
                 descent=max((-s.get("descender",fonts[s["font"]][0].descender)*s["size"]+s.get("_rise",0))*scale for _,s in row)
                 baseline=y+ascent
-                if baseline+descent>region.y1+.25:return None
-                x=region.x0+(max(0,region.width-width)/2 if align=="center" else max(0,region.width-width) if align=="right" else 0)
+                if baseline+descent>area.y1+.25:
+                    if not flow:return None
+                    part+=1;area=continuation;y=area.y0;baseline=y+ascent
+                    if part>10 or len(doc)+part>100 or baseline+descent>area.y1:raise EngineError("The paragraph exceeds the continuation-page limit.")
+                x=area.x0+(max(0,area.width-width)/2 if align=="center" else max(0,area.width-width) if align=="right" else 0)
                 spaces=sum(c==" " for c,_ in row)
                 extra=(region.width-width)/spaces if align=="justify" and not hard and spaces else 0
                 for c,s in row:
                     advance=fonts[s["font"]][0].text_length(c,fontsize=s["size"]*scale)
-                    placed.append((x,baseline+s.get("_rise",0)*scale,c,s));x+=advance+(extra if c==" " else 0)
+                    placed.append((part,x,baseline+s.get("_rise",0)*scale,c,s));x+=advance+(extra if c==" " else 0)
                 y+=max(ascent+descent,max(s["size"] for _,s in row)*scale*1.25)
             return placed,len(rows)
         scale=1.0;plan=layout(scale)
@@ -165,35 +174,44 @@ def edit_paragraph(data, params):
                 if min(s["size"] for s in styles)*scale<6:break
                 plan=layout(scale)
                 if plan is not None:break
+        if plan is None and params.get("flow"):
+            scale=1.0;plan=layout(scale,True)
         if plan is None:raise EngineError("The paragraph does not fit. Allow safe downward growth or smaller text, or shorten the replacement.")
         before=page.get_pixmap(alpha=False,annots=True);fields=field_state(doc);rotation_matrix=fitz.Matrix(page.rotation_matrix)
         # Remove only selected original span rectangles, never images or background graphics.
         for line in p["_lines"]:
             for span in line["spans"]:page.add_redact_annot(span["bbox"],fill=False,cross_out=False)
         page.apply_redactions(images=0,graphics=0,text=0)
-        for font,buffer,name in fonts.values():
-            if buffer:page.insert_font(fontname=name,fontbuffer=buffer)
+        original_count=len(doc);extra_pages=max((item[0] for item in plan[0]),default=0)
+        for _ in range(extra_pages):doc.new_page(width=page_size.width,height=page_size.height)
+        targets=[pn]+list(range(original_count,len(doc)))
+        for target in targets:
+            for font,buffer,name in fonts.values():
+                if buffer:doc[target].insert_font(fontname=name,fontbuffer=buffer)
         # Merge adjacent characters of one style back into native PDF text strings.
         groups=[]
-        for x,y,c,s in plan[0]:
+        for part,x,y,c,s in plan[0]:
             if groups:
                 g=groups[-1]
-                expected=g[0]+fonts[s["font"]][0].text_length(g[2],fontsize=s["size"]*scale) if g[3] is s else -1
-                if g[3] is s and abs(g[1]-y)<.01 and abs(expected-x)<.01:g[2]+=c;continue
-            groups.append([x,y,c,s])
-        for x,y,value,s in groups:
-            page.insert_text((x,y),value,fontname=fonts[s["font"]][2],fontsize=s["size"]*scale,
+                expected=g[1]+fonts[s["font"]][0].text_length(g[3],fontsize=s["size"]*scale) if g[4] is s else -1
+                if g[0]==part and g[4] is s and abs(g[2]-y)<.01 and abs(expected-x)<.01:g[3]+=c;continue
+            groups.append([part,x,y,c,s])
+        for part,x,y,value,s in groups:
+            doc[targets[part]].insert_text((x,y),value,fontname=fonts[s["font"]][2],fontsize=s["size"]*scale,
                              color=fitz.sRGB_to_pdf(s["color"]),fill_opacity=s.get("alpha",255)/255)
         output=doc.tobytes(garbage=4,deflate=True)
+        if len(output)>40*1024*1024:raise EngineError("The edited PDF exceeds 40 MB. Split the document first.")
         with fitz.open(stream=output,filetype="pdf") as check:
-            if len(check)!=len(doc) or field_state(check)!=fields:raise EngineError("Page or form verification failed.")
+            if len(check)!=original_count+extra_pages or field_state(check)!=fields:raise EngineError("Page or form verification failed.")
             if not outside_pixels_unchanged(before,check[pn].get_pixmap(alpha=False,annots=True),region,rotation_matrix):
                 raise EngineError("Rendering changed outside the paragraph. No edited copy was created.")
             actual=norm(check[pn].get_textbox(region+(-1,-1,1,1)))
+            for target in targets[1:]:actual+=" "+norm(check[target].get_text())
             # Extraction can introduce line/space boundaries; compare visible non-whitespace text.
             if re.sub(r"\s+","",norm(text))!=re.sub(r"\s+","",actual):
                 raise EngineError("The saved paragraph text could not be verified. No edited copy was created.")
         return output,{"operation":"edit_paragraph","page":pn+1,"line_count":plan[1],"font_scale":scale,
                        "styles_preserved":bool(params.get("preserve_styles",True)),"fonts_reused":list(fonts),
-                       "surrounding_pixels_unchanged":True,"forms_preserved":True,"page_count_preserved":True,
+                       "surrounding_pixels_unchanged":True,"forms_preserved":True,"page_count_preserved":extra_pages==0,
+                       "output_page_count":len(doc),"continuation_pages":[i+1 for i in targets[1:]],
                        "paragraph_bbox":list(region),"source_sha256":sha(data),"output_sha256":sha(output)}

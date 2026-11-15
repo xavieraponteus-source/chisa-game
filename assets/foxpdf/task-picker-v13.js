@@ -113,6 +113,7 @@ function renderChoice(){
 }
 function launch(type){
  const choice=tasks[type]?type:"edit";activeTool=choice;selected=new Set();
+ if(app.current()&&!isMulti(choice)&&document.body.classList.contains("fx-mode-editor")){close();actOnSelected(choice);return;}
  const [title,note]=tasks[choice];shell(title,note);renderChoice();
  overlay?.querySelector(".fx-choice-close")?.focus();
 }
@@ -197,6 +198,7 @@ function signPanel(){
  const back=el("button","fx-choice-cancel","Choose a different PDF");back.type="button";back.onclick=()=>launch("sign");body.append(back);
 }
 function actOnSelected(type){
+ if(["ocr","convert","compress","protect","redact"].includes(type)&&window.FoxPDFIntegrity){close();editor("edit");window.FoxPDFIntegrity.open(type);return;}
  switch(type){
   case "edit":editor("edit");return;
   case "organize":editor("organize");return;

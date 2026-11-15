@@ -1,1 +1,22 @@
 .fxi-overlay{position:fixed;inset:0;z-index:20000;background:#000b;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box}.fxi-dialog{width:min(760px,100%);max-height:calc(100dvh - 24px);overflow:auto;border:1px solid #bd974c;border-radius:14px;background:#20232a;color:#f8edda;box-shadow:0 16px 60px #0009;font:16px/1.5 system-ui;text-align:left}.fxi-dialog header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid #716039}.fxi-dialog h2{font:600 21px/1.3 system-ui;margin:0}.fxi-body{padding:16px 18px;display:grid;gap:14px}.fxi-dialog label{display:grid;gap:6px}.fxi-dialog input,.fxi-dialog select,.fxi-dialog textarea{box-sizing:border-box;width:100%;min-height:44px;padding:9px;border:1px solid #9b865e;border-radius:7px;background:#fff;color:#171b23;font:16px/1.4 system-ui}.fxi-dialog input[type=checkbox]{width:24px;min-height:24px;justify-self:start}.fxi-dialog button{min-height:44px;padding:9px 14px;border:1px solid #ab8e4b;border-radius:8px;background:#36383d;color:#fff;font:600 15px system-ui;cursor:pointer;touch-action:manipulation}.fxi-dialog button:disabled{opacity:.5;cursor:wait}.fxi-dialog .fxi-primary{background:#dfbe75;color:#211b12}.fxi-note{font-size:14px;color:#e2d0a7;margin:0;overflow-wrap:anywhere}.fxi-status{padding:12px 18px;border-top:1px solid #716039;margin:0;overflow-wrap:anywhere}.fxi-report{max-width:100%;overflow:hidden}.fxi-report pre{font:12px/1.4 monospace;white-space:pre-wrap;overflow-wrap:anywhere}.fxi-dialog :focus-visible{outline:3px solid #65b7ff;outline-offset:2px}@media(max-width:500px){.fxi-dialog{max-height:calc(100dvh - 16px)}.fxi-overlay{padding:8px}.fxi-dialog header,.fxi-body{padding:12px}.fxi-dialog h2{font-size:18px}.fxi-dialog button{width:100%}.fxi-dialog header button{width:auto}}
+.fxi-panel{min-width:0;min-height:0;overflow:hidden;grid-column:4;grid-row:1;background:#292b30;border-left:1px solid #756140;display:flex}
+.fxi-panel .fxi-dialog{width:100%;max-height:none;height:100%;border:0;border-radius:0;box-shadow:none;display:flex;flex-direction:column;overflow:hidden;font-size:14px}
+.fxi-panel .fxi-body{min-height:0;flex:1;overflow:auto;padding:12px;gap:10px}
+.fxi-panel .fxi-dialog header{padding:10px 12px;flex:none}
+.fxi-panel .fxi-dialog h2{font-size:17px}
+.fxi-panel .fxi-status{flex:none;padding:9px 12px;font-size:13px;max-height:100px;overflow:auto}
+.fxi-panel .fxi-tabs{display:flex;flex:none;gap:4px;padding:8px;border-bottom:1px solid #716039}
+.fxi-panel .fxi-tabs button{flex:1;padding:6px;font-size:12px;min-height:38px}
+.fxi-panel textarea{min-height:120px}
+.fxi-panel .fxi-note{font-size:12px}
+.fxi-panel label:has(input[type=checkbox]){display:grid;grid-template-columns:24px 1fr;align-items:start;column-gap:8px}
+.fxi-panel label:has(input[type=checkbox])>input{grid-column:1;grid-row:1}
+.fxi-panel label:has(input[type=checkbox])>span{grid-column:2;grid-row:1}
+.fxie-root .fxie-layout.fxi-docked{grid-template-columns:220px minmax(0,1fr) 44px minmax(300px,370px)!important}
+.fxie-root .fxie-layout.fxi-docked>.fxie-left{grid-column:1;grid-row:1}
+.fxie-root .fxie-layout.fxi-docked>.fxie-stage{grid-column:2;grid-row:1}
+.fxie-root .fxie-layout.fxi-docked>.fxie-right{grid-column:3;grid-row:1}
+.fxi-docked .fxie-editorbar{overflow-x:auto;overflow-y:hidden}
+.fxi-docked .fxie-barleft,.fxi-docked .fxie-barright{flex:0 0 auto}
+@media(max-width:1100px){.fxie-root .fxie-layout.fxi-docked{grid-template-columns:minmax(0,1fr) 40px minmax(280px,340px)!important}.fxie-root .fxie-layout.fxi-docked>.fxie-left{display:none!important}.fxie-root .fxie-layout.fxi-docked>.fxie-stage{grid-column:1}.fxie-root .fxie-layout.fxi-docked>.fxie-right{grid-column:2}.fxi-panel{grid-column:3}}
+@media(max-width:700px){.fxie-root .fxie-layout.fxi-docked{grid-template-columns:minmax(0,1fr) 36px!important;grid-template-rows:minmax(150px,1fr) minmax(180px,44dvh)!important}.fxi-panel{grid-column:1 / -1;grid-row:2;border-left:0;border-top:1px solid #756140}.fxi-panel .fxi-dialog header{padding:6px 10px}.fxi-panel .fxi-body{padding:10px}.fxi-panel .fxi-dialog button{width:auto}.fxi-panel .fxi-dialog .fxi-primary{width:100%}.fxi-panel .fxi-tabs{padding:4px}.fxi-panel .fxi-status{max-height:65px}.fxi-panel .fxi-dialog h2{font-size:15px}}
