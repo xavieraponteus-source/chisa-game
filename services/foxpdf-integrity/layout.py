@@ -2,7 +2,7 @@
 import difflib, math, re, unicodedata
 from collections import Counter
 import pymupdf as fitz
-from engine import EngineError, open_pdf, sha, norm, resolve_font, field_state, outside_pixels_unchanged
+from engine import EngineError, open_pdf, sha, norm, resolve_font, field_state, outside_pixels_unchanged, ensure_visible_text
 
 
 def paragraphs(page):
@@ -120,6 +120,7 @@ def edit_paragraph(data, params, region_override=None):
             page=doc[pn];p=next(p for p in paragraphs(page) if p["id"]==params["paragraph_id"])
         except (KeyError,ValueError,StopIteration,TypeError):raise EngineError("Inspect and select the current paragraph again.")
         if not p["editable"]:raise EngineError("Use precise text editing for rotated text runs.")
+        ensure_visible_text(page,p['bbox'])
         if any(a.type[0]==fitz.PDF_ANNOT_REDACT for a in (page.annots() or [])):
             raise EngineError("Apply or remove existing redaction marks first.")
         region=safe_region(page,p,bool(params.get("grow")))

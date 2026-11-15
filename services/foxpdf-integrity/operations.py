@@ -2,7 +2,7 @@
 import difflib,math,re
 import pymupdf as fitz
 from PIL import Image,ImageChops,ImageDraw
-from engine import EngineError,open_pdf,sha,norm,resolve_font,field_state,runs
+from engine import EngineError,open_pdf,sha,norm,resolve_font,field_state,runs,ensure_visible_text
 
 def unchanged_except(before,after,rects,matrix):
     if (before.width,before.height)!=(after.width,after.height):return False
@@ -59,6 +59,7 @@ def replace_text(data,params):
             page=doc[pn];s,line=next((s,l) for ident,s,l in runs(page) if ident==identifier)
             if line.get('dir',(1,0))!=(1.0,0.0):raise EngineError('Use precise editing for rotated text runs.')
             rect=fitz.Rect(s['bbox'])
+            ensure_visible_text(page,rect)
             if any(rect.intersects(w.rect) for w in (page.widgets() or [])):raise EngineError('Use form filling for text inside fields.')
             if any(a.type[0]==fitz.PDF_ANNOT_REDACT for a in (page.annots() or [])):raise EngineError('Apply or remove pending redaction marks first.')
             for ident,other,_ in runs(page):
@@ -103,6 +104,7 @@ def move_text(data,params):
         except (KeyError,ValueError,TypeError,StopIteration):raise EngineError('Select text and a valid destination page/position.')
         if source.rotation or target.rotation or not p['editable']:raise EngineError('Native text dragging currently requires unrotated pages and horizontal text.')
         old=fitz.Rect(p['bbox']);new=fitz.Rect(x,y,x+old.width,y+old.height)
+        ensure_visible_text(source,old)
         if not target.rect.contains(new):raise EngineError('The entire text block must fit inside the destination page.')
         members=set(p['_members'])
         for page_no,region in [(pn,old),(dest,new)]:
