@@ -755,9 +755,14 @@ function showMovableInk(sheet,pageOverride,scaleOverride,dimensions){
  const height=button("↕","fxie-ink-grip fxie-ink-height","Drag vertically to resize drawing height");
  const corner=button("⤡","fxie-ink-grip fxie-ink-corner","Drag corner to resize width and height");
  frame.append(toolbar,width,height,corner);
+ function positionToolbar(){
+  fxiePositionImageToolbar(frame,toolbar,sheet);
+  for(const property of ["left","top","bottom"]){const value=toolbar.style[property];if(value)toolbar.style.setProperty(property,value,"important")}
+ }
  function updatePosition(){
   const b=state.box;frame.style.left=(b.x*sc)+"px";frame.style.top=((h-b.y-b.height)*sc)+"px";
   frame.style.width=(b.width*sc)+"px";frame.style.height=(b.height*sc)+"px";
+  if(frame.isConnected)positionToolbar();
  }
  updatePosition();
  let interaction=null;
@@ -869,7 +874,7 @@ function showMovableInk(sheet,pageOverride,scaleOverride,dimensions){
   state.busy=true;try{await fxieCommitVerified(app.readCurrent(),state.baseBytes.slice());inkSession=null;frame.remove();say("Drawing removed. Use Undo if you want it back.")}catch(err){say("Unable to remove drawing: "+err.message,true)}finally{state.busy=false}
  };
  frame.addEventListener("click",e=>e.stopPropagation());
- sheet.append(frame);fxiePositionImageToolbar(frame,toolbar,sheet);
+ sheet.append(frame);positionToolbar();
 }
 
 /* Advanced reflow stays explicit and opt-in; ordinary clicks never send PDFs to a server. */
