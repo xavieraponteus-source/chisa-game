@@ -2,7 +2,7 @@
 (function(){"use strict";
 const ready=fn=>document.readyState==="loading"?document.addEventListener("DOMContentLoaded",fn,{once:true}):fn();
 ready(()=>{
-if(window.FoxPDFIntegrity?.version==="1.8")return;
+if(window.FoxPDFIntegrity?.version==="1.9")return;
 const app=window.FoxPDFBridge;if(!app)return;
 const make=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};
 const css=document.createElement("link");css.rel="stylesheet";css.href="/fox-assets/integrity-tools-v1.css?v=1.7";document.head.append(css);
@@ -23,11 +23,16 @@ function dialog(title){
  keyTrap=e=>{if(modal&&box.contains(document.activeElement)&&e.key==="Escape"){e.preventDefault();e.stopPropagation();close()}};document.addEventListener("keydown",keyTrap,true);window.dispatchEvent(new Event("resize"));
  header.querySelector("button").focus();return {body,status,box,root:modal};
 }
+function serviceURL(service,path){
+ const publicSite=window.location?.hostname==="xavier-is-working.com";
+ const origin=publicSite?"https://foxpdf-studio-web-production.up.railway.app":"";
+ return origin+"/api/"+service+"/"+path;
+}
 async function request(source,path,operation,params,service="integrity"){
  if(source.bytes.length>20*1024*1024)throw Error("This workflow accepts PDFs smaller than 20 MB.");
  const form=new FormData();form.append("file",new File([source.bytes],source.name,{type:"application/pdf"}));
  if(operation){form.append("operation",operation);form.append("params",JSON.stringify(params||{}))}
- const response=await fetch("/api/"+service+"/"+path,{method:"POST",body:form,credentials:"omit"});
+ const response=await fetch(serviceURL(service,path),{method:"POST",body:form,credentials:"omit"});
  if(!response.ok){let error="The engine could not finish ("+response.status+").";try{error=(await response.json()).detail||error}catch{}throw Error(error)}return response;
 }
 function disclosure(body){const detail=make("details");detail.append(make("summary","Processing and privacy"),make("p","Inspect and Apply temporarily upload this PDF to FoxPDF’s processor. Text edits update this document with Undo. Sanitized redaction creates a separate image-only document in the same editor.","fxi-note"));const source=make("a","Engine source and license","fxi-note");source.href="https://github.com/xavieraponteus-source/chisa-game/tree/main/services/foxpdf-integrity";source.target="_blank";source.rel="noopener";detail.append(source);body.append(detail)}
@@ -248,7 +253,7 @@ function compare(){
   const other=choice.value==="file"?(file.files[0]?{name:file.files[0].name,bytes:new Uint8Array(await file.files[0].arrayBuffer())}:null):app.read(Number(choice.value));
   if(!other)throw Error("Choose the second PDF.");if(source.bytes.length+other.bytes.length>20*1024*1024)throw Error("The two PDFs together must be smaller than 20 MB.");
   const form=new FormData();form.append("file",new File([source.bytes],source.name,{type:"application/pdf"}));form.append("other",new File([other.bytes],other.name,{type:"application/pdf"}));
-  const response=await fetch("/api/integrity/compare",{method:"POST",body:form,credentials:"omit"});if(!response.ok){let message="Comparison failed ("+response.status+").";try{message=(await response.json()).detail||message}catch{}throw Error(message)}
+  const response=await fetch(serviceURL("integrity","compare"),{method:"POST",body:form,credentials:"omit"});if(!response.ok){let message="Comparison failed ("+response.status+").";try{message=(await response.json()).detail||message}catch{}throw Error(message)}
   const report=await response.json();if(modal!==ui.root)return;if(!same(source,app.readCurrent()))throw Error("The current PDF changed during comparison. Reopen Compare for the latest version.");results.replaceChildren();preview.replaceChildren();
   const pages=select(report.pages.map(p=>[String(p.page),"Page "+p.page+" · "+p.kind+(p.pixel_difference_percent?" · "+p.pixel_difference_percent+"% pixels changed":"")]));
   const changes=make("div");results.append(field("Comparison page",pages),changes,preview);reportView(results,report);
@@ -266,7 +271,7 @@ function compare(){
  }catch(e){ui.status.textContent=e.message}finally{run.disabled=false}},true);
  ui.body.append(field("Compare current PDF with",choice),file,run,results);
 }
-window.FoxPDFIntegrity={version:"1.8",open:type=>type==="compare"?compare():type==="search"?search():type==="move"?moveText():type==="redact"?redact():type==="paragraph"?paragraph():["ocr","compress","convert","protect"].includes(type)?processing(type==="protect"?"encrypt":type):edit(),editSelection:selection=>paragraph(selection),sameSource:same};
+window.FoxPDFIntegrity={version:"1.9",open:type=>type==="compare"?compare():type==="search"?search():type==="move"?moveText():type==="redact"?redact():type==="paragraph"?paragraph():["ocr","compress","convert","protect"].includes(type)?processing(type==="protect"?"encrypt":type):edit(),editSelection:selection=>paragraph(selection),sameSource:same};
 const bar=document.querySelector(".fxie-barleft");if(bar){bar.append(button("Paragraph edit",paragraph),button("Precise text",edit),button("Redact & sanitize",redact),button("PDF tools",()=>processing("ocr")))}
 const convert=document.getElementById("fxieConvert");if(convert)convert.onclick=()=>processing("convert");
 const advanced=document.getElementById("fxieAdvanced");if(advanced)advanced.onclick=()=>processing("ocr");
