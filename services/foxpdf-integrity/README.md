@@ -8,4 +8,6 @@ Sanitized redaction searches requested phrases using native extraction and manda
 
 Run `python -m unittest -v test_engine`. Build with the included Dockerfile to install Tesseract and the supported OCR languages.
 
+Paragraph editing (`edit_paragraph`) reflows supported horizontal paragraphs with original reusable fonts and mixed formatting mapped onto unchanged text. It supports explicit line breaks, left/center/right/justified alignment, optional downward growth constrained by text, images, links, annotations, form fields and table rules, and optional bounded shrinking. Saved text, surrounding rendering and form state are checked before returning a separate editable preview. Other objects and pages stay fixed: automatic cross-page reflow, table-row resizing, arbitrary angled paragraphs and right-to-left shaping are not implemented. Run `python -m unittest discover -v` to include paragraph regressions.
+
 This service uses PyMuPDF under GNU AGPL v3. Its corresponding source, requirements and build instructions are published in this directory. The service source in this directory is licensed under GNU AGPL v3; see https://www.gnu.org/licenses/agpl-3.0.html. This notice applies to this separate service, not unrelated repository files. A proprietary deployment requires an appropriate commercial PyMuPDF license or compliance with AGPL obligations.

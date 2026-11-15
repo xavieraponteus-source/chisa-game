@@ -83,8 +83,36 @@ function redact(){
  }catch(e){ui.status.textContent=e.message}finally{run.disabled=false}},true);
  ui.body.append(run,button("Use standard searchable-text redaction instead",()=>{close();app.advanced("redact")}));
 }
-window.FoxPDFIntegrity={open:type=>type==="redact"?redact():edit(),sameSource:same};
-const bar=document.querySelector(".fxie-barleft");if(bar){bar.append(button("Precise text",edit),button("Redact & sanitize",redact))}
+function paragraph(){
+ const source=app.readCurrent();if(!source){app.open();return app.say("Open a PDF, then choose Paragraph edit.")}
+ const ui=dialog("Edit and reflow a paragraph");disclosure(ui.body);
+ ui.body.append(make("p","Rewrite a whole paragraph and wrap it into new lines. Unchanged words retain their original fonts, sizes and colors; new words inherit nearby formatting. Column boundaries, table rules, images and forms constrain the available space. The original PDF remains unchanged.","fxi-note"));
+ const inspect=button("Inspect paragraphs",async()=>{inspect.disabled=true;ui.status.textContent="Identifying paragraph boundaries and nearby objects…";try{
+  if(!same(source,app.readCurrent()))throw Error("The document changed. Reopen this tool.");
+  const response=await request(source,"inspect"),info=await response.json();if(modal!==ui.root)return;
+  if(info.signed)throw Error("Use an unsigned copy before editing a signed PDF.");
+  if(!info.pages.every(p=>Array.isArray(p.paragraphs)))throw Error("The paragraph engine is being upgraded. Refresh FoxPDF shortly and try again.");
+  const page=select(info.pages.map(p=>[String(p.page),"Page "+p.page])),choice=select([]),text=make("textarea");text.rows=8;text.maxLength=10000;
+  const grow=make("input");grow.type="checkbox";grow.checked=true;
+  const fit=make("input");fit.type="checkbox";
+  const styles=make("input");styles.type="checkbox";styles.checked=true;
+  const align=select([["left","Left"],["center","Center"],["right","Right"],["justify","Justify"]]),summary=make("p",undefined,"fxi-note");
+  const selected=()=>info.pages.find(p=>p.page===Number(page.value))?.paragraphs.find(p=>p.id===choice.value);
+  const show=()=>{const p=selected();text.value=p?.text||"";summary.textContent=p?p.line_count+" original lines · "+p.fonts.join(", ")+" · "+Math.round(p.bbox[2]-p.bbox[0])+" pt wide · up to "+Math.round(p.available_bbox[3]-p.bbox[1])+" pt high with safe growth":"No paragraphs found. Run OCR on an image-only PDF first."};
+  const changed=()=>{choice.replaceChildren();for(const p of info.pages.find(p=>p.page===Number(page.value))?.paragraphs||[]){const o=make("option",(p.editable?"":"Unsupported · ")+p.text.slice(0,140));o.value=p.id;choice.append(o)}show()};page.onchange=changed;choice.onchange=show;changed();
+  const apply=button("Create reflowed preview copy",async()=>{apply.disabled=true;ui.status.textContent="Wrapping text, saving and checking surrounding content…";try{
+   if(!same(source,app.readCurrent()))throw Error("The document changed. Inspect the current copy again.");
+   const p=selected();if(!p||!p.editable)throw Error("Choose a supported horizontal paragraph. Use Precise text for rotated runs.");
+   const response=await request(source,"process","edit_paragraph",{source_sha256:info.source_sha256,page:Number(page.value),paragraph_id:p.id,text:text.value,grow:grow.checked,fit:fit.checked,preserve_styles:styles.checked,align:align.value});
+   const report=await installCopy(source,response,"-paragraph-edit");ui.status.textContent="Reflowed copy opened. Surrounding rendering, page count and form values verified. Review the layout, then Save PDF.";reportView(ui.body,report);
+  }catch(e){ui.status.textContent=e.message}finally{apply.disabled=false}},true);
+  ui.body.append(field("Page",page),field("Original paragraph",choice),summary,field("Replacement paragraph",text),field("Alignment",align),field("Preserve mixed formatting on unchanged words",styles),field("Allow downward growth into verified free space",grow),field("Allow smaller text if needed (minimum 6 pt)",fit),make("p","This tool keeps other objects and pages in place. It blocks overflow instead of moving another column, table row or image. The preview is a separate editable PDF.","fxi-note"),apply);
+  inspect.remove();ui.status.textContent="Paragraphs ready. Choose a paragraph and review the replacement before creating a copy.";
+ }catch(e){ui.status.textContent=e.message;inspect.disabled=false}},true);ui.body.append(inspect);
+}
+window.FoxPDFIntegrity={open:type=>type==="redact"?redact():type==="paragraph"?paragraph():edit(),sameSource:same};
+const bar=document.querySelector(".fxie-barleft");if(bar){bar.append(button("Paragraph edit",paragraph),button("Precise text",edit),button("Redact & sanitize",redact))}
 const selectedBox=document.getElementById("fxieReplaceBox");if(selectedBox)selectedBox.append(button("Precise original-text editor",edit));
+if(selectedBox)selectedBox.append(button("Reflow whole paragraph",paragraph));
 });
 })();
