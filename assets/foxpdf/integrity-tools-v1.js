@@ -2,7 +2,7 @@
 (function(){"use strict";
 const ready=fn=>document.readyState==="loading"?document.addEventListener("DOMContentLoaded",fn,{once:true}):fn();
 ready(()=>{
-if(window.FoxPDFIntegrity?.version==="2.0")return;
+if(window.FoxPDFIntegrity?.version==="2.1")return;
 const app=window.FoxPDFBridge;if(!app)return;
 const make=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};
 const css=document.createElement("link");css.rel="stylesheet";css.href="/fox-assets/integrity-tools-v1.css?v=1.7";document.head.append(css);
@@ -161,17 +161,19 @@ function paragraph(selection=null){
   const cleanPage=await task.getPage(Number(page.value)),viewport=cleanPage.getViewport({scale:1.5}),canvas=make("canvas",undefined,"fxi-live-background");canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
   await cleanPage.render({canvasContext:canvas.getContext("2d"),viewport}).promise;await task.destroy();
   if(modal!==ui.root)return;
-  let expected=source,fontScale=1,position=null,composing=false,drag=null;
+  let expected=source,fontScale=1,position=null,composing=false,drag=null,metricRatio=1;
   const preview=make("div",p.text,"fxi-live-text");preview.contentEditable="plaintext-only";preview.setAttribute("role","textbox");preview.setAttribute("aria-label","Edit paragraph directly on PDF");preview.setAttribute("aria-multiline","true");preview.spellcheck=false;
   const tools=make("div",undefined,"fxi-live-toolbar"),sizeLabel=make("span","100%");
   const params=()=>({source_sha256:info.source_sha256,page:editingPage,paragraph_id:p.id,text:text.value,font_scale:fontScale,position,grow:grow.checked,fit:fit.checked,flow:flow.checked,table_grow:tableGrow.checked,preserve_styles:styles.checked,align:align.value});
   const writer=liveWriter({snapshot:params,process:async value=>{if(!same(expected,app.readCurrent()))throw Error("The PDF changed elsewhere. Finish this draft or select the text again.");if(value.flow&&value.table_grow)throw Error("Choose continuation pages or table growth, rather than both.");return {response:await request(source,"process","edit_paragraph",value),flow:value.flow}},commit:async result=>{await applyResult(expected,result.response,result.flow,source.count);expected=app.readCurrent()},status:value=>ui.status.textContent=value});
   function positionPreview(){const surface=window.FoxPDFInteractiveEditor.pageSurface(editingPage);if(!surface)return;const scale=surface.scale,at=position||{x:p.bbox[0],y:p.bbox[1]};
-   Object.assign(preview.style,{left:at.x*scale+"px",top:at.y*scale+"px",width:(p.bbox[2]-p.bbox[0])*Math.max(1,fontScale)*scale+"px",fontSize:(p.font_size||12)*fontScale*scale+"px",textAlign:align.value});
+   Object.assign(preview.style,{left:at.x*scale+"px",top:at.y*scale+"px",width:((p.bbox[2]-p.bbox[0])*Math.max(1,fontScale)+.5)*scale/metricRatio+"px",transform:"scaleX("+metricRatio+")",transformOrigin:"top left",fontSize:(p.font_size||12)*fontScale*scale+"px",textAlign:align.value});
    Object.assign(tools.style,{left:at.x*scale+"px",top:Math.max(0,at.y*scale-42)+"px"});
    if(canvas.parentNode!==surface.sheet)surface.sheet.append(canvas,preview,tools);
   }
   preview.style.fontFamily=/Times|Serif|tiro/i.test(p.fonts.join(" "))?'"Times New Roman",serif':/Courier|Mono/i.test(p.fonts.join(" "))?'monospace':'Arial,sans-serif';preview.style.fontWeight=p.bold?"bold":"normal";preview.style.fontStyle=p.italic?"italic":"normal";preview.style.color="#"+(p.color||0).toString(16).padStart(6,"0");
+  if(p.line_count===1){const metrics=make("canvas").getContext("2d");metrics.font=[preview.style.fontStyle,preview.style.fontWeight,(p.font_size||12)+"px",preview.style.fontFamily].join(" ");const measured=metrics.measureText(p.text).width;if(measured>0)metricRatio=Math.max(.6,Math.min(1.4,(p.bbox[2]-p.bbox[0])/measured))}
+
   function changed(){if(preview.textContent!==text.value)preview.textContent=text.value;positionPreview();writer.change()}
   const resize=factor=>{fontScale=Math.max(Math.max(.25,6/(p.font_size||12)),Math.min(4,Math.round(fontScale*factor*100)/100));sizeLabel.textContent=Math.round(fontScale*100)+"%";changed()};
   const grip=button("↔ Move",()=>{});grip.setAttribute("aria-label","Drag paragraph to move it");
@@ -322,7 +324,7 @@ document.addEventListener("click",async event=>{
  try{if(["fxieSave","download","fxiePrint","fxieShare"].includes(target.id))await liveEdit.flush();else await finishLive();replayDownload=true;target.click()}catch(e){app.say("Finish saving your text first: "+e.message)}finally{replayDownload=false}
 },true);
 window.addEventListener("beforeunload",event=>{if(liveEdit?.writer.dirty){event.preventDefault();event.returnValue=""}});
-window.FoxPDFIntegrity={version:"2.0",open:async type=>{try{await finishLive();return type==="compare"?compare():type==="search"?search():type==="move"?moveText():type==="redact"?redact():type==="paragraph"?paragraph():["ocr","compress","convert","protect"].includes(type)?processing(type==="protect"?"encrypt":type):edit()}catch(e){app.say(e.message)}},editSelection:async selection=>{try{await finishLive();paragraph(selection)}catch(e){app.say(e.message)}},sameSource:same};
+window.FoxPDFIntegrity={version:"2.1",open:async type=>{try{await finishLive();return type==="compare"?compare():type==="search"?search():type==="move"?moveText():type==="redact"?redact():type==="paragraph"?paragraph():["ocr","compress","convert","protect"].includes(type)?processing(type==="protect"?"encrypt":type):edit()}catch(e){app.say(e.message)}},editSelection:async selection=>{try{await finishLive();paragraph(selection)}catch(e){app.say(e.message)}},sameSource:same};
 const bar=document.querySelector(".fxie-barleft");if(bar){bar.append(button("Paragraph edit",paragraph),button("Precise text",edit),button("Redact & sanitize",redact),button("PDF tools",()=>processing("ocr")))}
 const convert=document.getElementById("fxieConvert");if(convert)convert.onclick=()=>processing("convert");
 const advanced=document.getElementById("fxieAdvanced");if(advanced)advanced.onclick=()=>processing("ocr");
