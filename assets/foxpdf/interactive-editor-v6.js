@@ -601,17 +601,14 @@ function showInline(){
  field.focus({preventScroll:true});field.setSelectionRange(field.value.length,field.value.length);
 }
 async function chooseText(text,button,pageNum,box){
- if(window.FoxPDFIntegrity?.editSelection){closeInline();window.FoxPDFIntegrity.editSelection({text,page:pageNum});return;}
- closeInline();view.querySelectorAll(".fxie-textregion").forEach(a=>a.classList.remove("selected"));button.classList.add("selected");
- selected={text,page:pageNum,box,button,revision:++localRevision,source:app.readCurrent()};
- $("fxieReplaceBox").hidden=false;$("fxieInsertBox").hidden=true;
- $("fxieParagraph").replaceChildren(new Option("Selected text segment · local editing","local"));
- $("fxieReplacement").value=text;
- const font=(box.fontFamily||"").toLowerCase();const guess=font.includes("courier")||font.includes("mono")?"Courier":font.includes("times")||font.includes("serif")?"TimesRoman":"Helvetica";
- $("fxieFont").value=guess;$("fxieSize").value=String(Math.max(5,Math.min(80,Math.round(box.height/box.scale))));
- const pixel=samplePixels(box);if(pixel.ink)$("fxieColor").value=cssColor(pixel.ink);
- showInline();
- say(pixel.uniform?"Editing locally—no upload or permission popup. Press Ctrl+Enter or Apply to save.":"Editing locally. This area has a complex background; check the appearance after applying.");
+ // Original PDF characters must be edited as PDF objects, never hidden with a
+ // sampled-color rectangle. White/colored covers can leave glyph fragments.
+ closeInline();
+ if(!window.FoxPDFIntegrity?.editSelection){
+  say("Verified original-text editing is unavailable. Refresh the editor and try again; no changes were made.",true);
+  return;
+ }
+ window.FoxPDFIntegrity.editSelection({text,page:pageNum});
 }
 $("fxieParagraph").onchange=()=>{if(selected)$("fxieReplacement").value=selected.text};
 $("fxieReplacement").oninput=()=>{const textarea=inlineEditor?.querySelector("textarea");if(textarea&&textarea.value!==$("fxieReplacement").value)textarea.value=$("fxieReplacement").value};
@@ -1737,17 +1734,14 @@ async function setSplitView(pageNumber,refresh=false){
     const button=el("button","fxie-textregion");
     button.type="button";button.textContent="";button.title="Edit: "+item.str.slice(0,100);
     Object.assign(button.style,{position:"absolute",left:mat[4]+"px",top:(mat[5]-size)+"px",width:Math.max(9,Math.abs(item.width)*scale)+"px",height:size+"px",pointerEvents:"auto"});
-    button.addEventListener("click",async e=>{
+    button.addEventListener("click",e=>{
      if(splitEditMode!=="edit")return;
      e.preventDefault();e.stopPropagation();
-     const replacement=await rightTextInput(item.str,{x:mat[4],y:mat[5]-size},"Edit text on page "+n);
-     if(replacement===null||replacement===item.str)return;
-     await rightMutate(async(pdf,pg)=>{
-      const font=await fxieEmbedSelectedFont(pdf),sz=Math.max(6,size/scale);
-      const px=mat[4]/scale,py=pg.getHeight()-mat[5]/scale;
-      pg.drawRectangle({x:Math.max(0,px-1),y:Math.max(0,py-2),width:Math.min(pg.getWidth()-px,Math.max(item.width/1,sz*.8)+4),height:sz+5,color:PDFLib.rgb(1,1,1)});
-      if(replacement.trim())pg.drawText(replacement,{x:px,y:py,size:sz,font,color:color(),maxWidth:Math.max(10,pg.getWidth()-px-4)});
-     },"Edited right-page text. Review the PDF before saving.");
+     if(!window.FoxPDFIntegrity?.editSelection){
+      say("Verified original-text editing is unavailable. Refresh the editor; no PDF text was changed.",true);
+      return;
+     }
+     window.FoxPDFIntegrity.editSelection({text:item.str,page:n});
     });
     hitLayer.append(button);
    }
