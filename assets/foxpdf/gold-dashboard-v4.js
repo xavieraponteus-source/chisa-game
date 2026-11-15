@@ -46,7 +46,7 @@ const cardData=[
  ['draw','✎','Draw & Mark Up','Use finger, mouse, or stylus'],
  ['compress','⇵','Compress','Optimize file sizes'],
  ['batch','▤','Batch Process','Combine multiple files'],
- ['compare','◫','Compare','Coming soon']
+ ['compare','◫','Compare','Compare text and layout']
 ];
 tools.innerHTML='<div class="fx-tools-heading"><h2 id="fxToolsTitle">✦ Your PDF tools</h2><p>Choose a tool, or ask Chisa what to do.</p></div><div class="fx-tool-grid">'+cardData.map(([action,icon,label,description])=>'<button type="button" data-fx="'+action+'"><i>'+icon+'</i><b>'+label+'</b><small>'+description+'</small></button>').join("")+'</div><div class="fx-power-strip"><strong>✧ More powerful tools</strong><button data-fx="organize">Page management</button><button data-fx="watermark">Watermark</button><button data-fx="image">Add Image</button><button data-fx="numbers">Page numbers</button><button data-fx="icloud">Save to Files</button></div>';
 originalShortcuts.replaceWith(tools);
@@ -191,7 +191,7 @@ function act(action){
  case "certificate":window.FoxPDFReviews?window.FoxPDFReviews.sign():app.say("Certificate signing is still loading.");break;
  case "more":window.FoxPDFPro?window.FoxPDFPro.open("tools"):app.say("Additional tools are loading. Please retry.");break;
  case "batch":window.FoxPDFPro?window.FoxPDFPro.open("batch"):app.say("Batch tools are loading. Please retry.");break;
- case "compare":window.FoxPDFPro?window.FoxPDFPro.open("compare"):app.say("Document comparison tools are loading. Please retry.");break;
+ case "compare":window.FoxPDFIntegrity?window.FoxPDFIntegrity.open("compare"):app.say("Document comparison tools are loading. Please retry.");break;
  default:app.say("I couldn't find that tool. You can ask Chisa for help.")
  }
 }

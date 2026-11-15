@@ -198,7 +198,7 @@ function signPanel(){
  const back=el("button","fx-choice-cancel","Choose a different PDF");back.type="button";back.onclick=()=>launch("sign");body.append(back);
 }
 function actOnSelected(type){
- if(["ocr","convert","compress","protect","redact"].includes(type)&&window.FoxPDFIntegrity){close();editor("edit");window.FoxPDFIntegrity.open(type);return;}
+ if(["ocr","convert","compress","protect","redact","compare"].includes(type)&&window.FoxPDFIntegrity){close();editor("edit");window.FoxPDFIntegrity.open(type);return;}
  switch(type){
   case "edit":editor("edit");return;
   case "organize":editor("organize");return;
@@ -217,7 +217,7 @@ function actOnSelected(type){
   case "numbers":readyPanel(type,()=>app.click("numbers"),"Insert page numbers into the selected PDF.","Add page numbers");return;
   case "review":readyPanel(type,()=>window.FoxPDFReviews?.share(),"Creating a review link uploads your chosen PDF to private review storage.","Create review link");return;
   case "batch":readyPanel(type,()=>window.FoxPDFPro?.open("batch"),"Choose a batch operation; no changes happen until you confirm the tool.","Open batch tools");return;
-  case "compare":readyPanel(type,()=>window.FoxPDFPro?.open("compare"),"The comparison screen lets you choose its other PDF.","Choose comparison PDF");return;
+  case "compare":readyPanel(type,()=>window.FoxPDFIntegrity?.open("compare"),"The comparison screen lets you choose its other PDF.","Choose comparison PDF");return;
   default:editor("edit");
  }
 }
