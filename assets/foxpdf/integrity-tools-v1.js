@@ -2,10 +2,11 @@
 (function(){"use strict";
 const ready=fn=>document.readyState==="loading"?document.addEventListener("DOMContentLoaded",fn,{once:true}):fn();
 ready(()=>{
+if(window.FoxPDFIntegrity?.version==="1.8")return;
 const app=window.FoxPDFBridge;if(!app)return;
 const make=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};
 const css=document.createElement("link");css.rel="stylesheet";css.href="/fox-assets/integrity-tools-v1.css?v=1.7";document.head.append(css);
-let modal=null,lastFocus=null,keyTrap=null,fabState=null,clearHandle=null;
+let modal=null,lastFocus=null,keyTrap=null,fabState=null,clearHandle=null,layoutCache=null;
 const same=(a,b)=>!!a&&!!b&&a.name===b.name&&a.bytes.length===b.bytes.length&&a.bytes.every((v,i)=>v===b.bytes[i]);
 function close(){clearHandle?.();if(keyTrap)document.removeEventListener("keydown",keyTrap,true);keyTrap=null;const fab=document.getElementById("chatFab");if(fabState&&fab){if(fabState.value)fab.style.setProperty("display",fabState.value,fabState.priority);else fab.style.removeProperty("display")}fabState=null,clearHandle=null;modal?.parentElement?.classList.remove("fxi-docked");modal?.remove();modal=null;lastFocus?.focus?.();window.dispatchEvent(new Event("resize"))}
 function button(text,action,primary=false){const e=make("button",text,primary?"fxi-primary":"");e.type="button";e.onclick=action;return e}
@@ -30,6 +31,12 @@ async function request(source,path,operation,params,service="integrity"){
  if(!response.ok){let error="The engine could not finish ("+response.status+").";try{error=(await response.json()).detail||error}catch{}throw Error(error)}return response;
 }
 function disclosure(body){const detail=make("details");detail.append(make("summary","Processing and privacy"),make("p","Inspect and Apply temporarily upload this PDF to FoxPDF’s processor. Text edits update this document with Undo. Sanitized redaction creates a separate image-only document in the same editor.","fxi-note"));const source=make("a","Engine source and license","fxi-note");source.href="https://github.com/xavieraponteus-source/chisa-game/tree/main/services/foxpdf-integrity";source.target="_blank";source.rel="noopener";detail.append(source);body.append(detail)}
+async function inspectLayout(source){
+ if(layoutCache&&same(source,layoutCache.source))return layoutCache.promise;
+ const entry={source:{name:source.name,bytes:source.bytes.slice()},promise:null};
+ entry.promise=request(source,"inspect").then(response=>response.json()).catch(error=>{if(layoutCache===entry)layoutCache=null;throw error});
+ layoutCache=entry;return entry.promise;
+}
 async function installCopy(source,response,suffix){
  const bytes=new Uint8Array(await response.arrayBuffer()),pdf=await PDFLib.PDFDocument.load(bytes.slice());
  if(pdf.getPageCount()!==source.count)throw Error("The returned copy has a different page count. It was not opened.");
@@ -57,7 +64,7 @@ function edit(){
  ui.body.append(make("p","Edit one original text run at a time, including mixed-font paragraphs and right-angle text. The engine reuses its font and checks that rendering outside the selected run stays unchanged. Unsupported layouts are rejected.","fxi-note"));
  const load=button("Inspect text layout",async()=>{load.disabled=true;ui.status.textContent="Inspecting fonts and text runs…";try{
   if(!same(initial,app.readCurrent()))throw Error("The selected document changed. Reopen this tool.");
-  const response=await request(initial,"inspect"),info=await response.json();if(modal!==ui.root)return;
+  const info=await inspectLayout(initial);if(modal!==ui.root)return;
   if(info.signed)throw Error("This PDF already has a signature. Use an unsigned copy for editing.");
   const page=select(info.pages.map(p=>[String(p.page),"Page "+p.page])),run=select([]),replacement=make("textarea");replacement.rows=3;replacement.maxLength=2000;
   const fit=make("input");fit.type="checkbox";
@@ -110,10 +117,10 @@ function redact(){
 function paragraph(selection=null){
  const source=app.readCurrent();if(!source){app.open();return app.say("Open a PDF, then choose Paragraph edit.")}
  const ui=dialog("Edit and reflow a paragraph");disclosure(ui.body);
- ui.body.append(make("p","Rewrite a paragraph here while keeping the PDF visible. Apply updates this document; Undo restores the previous version.","fxi-note"));
+ ui.body.append(make("p","Opening original-text editing temporarily sends this PDF to FoxPDF to detect its paragraphs. Repeat selections reuse the detected layout. Your PDF changes only when you Apply; Undo restores the previous version.","fxi-note"));
  const inspect=button("Inspect paragraphs",async()=>{inspect.disabled=true;ui.status.textContent="Identifying paragraph boundaries and nearby objects…";try{
   if(!same(source,app.readCurrent()))throw Error("The document changed. Reopen this tool.");
-  const response=await request(source,"inspect"),info=await response.json();if(modal!==ui.root)return;
+  const info=await inspectLayout(source);if(modal!==ui.root)return;
   if(info.signed)throw Error("Use an unsigned copy before editing a signed PDF.");
   if(!info.pages.every(p=>Array.isArray(p.paragraphs)))throw Error("The paragraph engine is being upgraded. Refresh FoxPDF shortly and try again.");
   const page=select(info.pages.map(p=>[String(p.page),"Page "+p.page])),choice=select([]),text=make("textarea");text.rows=8;text.maxLength=10000;
@@ -139,6 +146,7 @@ function paragraph(selection=null){
   ui.body.append(field("Page",page),field("Original paragraph",choice),summary,field("Replacement paragraph",text),field("Alignment",align),field("Preserve mixed formatting",styles),field("Grow into free space below",grow),field("Allow smaller text (minimum 6 pt)",fit),field("Continue overflow on new pages at the end",flow),field("Grow a row in a simple white-background table",tableGrow),button("Move this paragraph",()=>moveText({page:Number(page.value),text:selected()?.text})),make("p","Continuation preserves existing pages. Table growth keeps the grid and other cell text, moving later rows only when space is clear; merged, decorated or colored tables are rejected.","fxi-note"),apply);
   inspect.remove();ui.status.textContent="Paragraphs ready. Choose a paragraph and review the replacement before creating a copy.";
  }catch(e){ui.status.textContent=e.message;inspect.disabled=false}},true);ui.body.append(inspect);
+ if(selection?.text||(layoutCache&&same(source,layoutCache.source)))inspect.click();
 }
 function processing(kind){
  const source=app.readCurrent();if(!source){app.open();return app.say("Open a PDF first.")}
@@ -187,7 +195,7 @@ function moveText(selection=null){
  ui.body.append(make("p","Select a paragraph, then drag its handle on the PDF or choose a destination below. Movement updates actual PDF text and supports Undo. Horizontal text on unrotated pages is supported; overlapping text and fields are rejected.","fxi-note"));
  const inspect=button("Detect movable paragraphs",async()=>{inspect.disabled=true;ui.status.textContent="Detecting paragraphs…";try{
   if(!same(source,app.readCurrent()))throw Error("The PDF changed. Reopen Move text.");
-  const info=await (await request(source,"inspect")).json();if(modal!==ui.root)return;
+  const info=await inspectLayout(source);if(modal!==ui.root)return;
   const page=select(info.pages.map(p=>[String(p.page),"Page "+p.page])),choice=select([]),target=select(info.pages.map(p=>[String(p.page),"Page "+p.page]));
   const x=make("input"),y=make("input");x.type=y.type="number";x.min=y.min="0";x.step=y.step="1";x.value="40";y.value="150";
   const selected=()=>info.pages.find(p=>p.page===Number(page.value))?.paragraphs.find(p=>p.id===choice.value);
@@ -258,7 +266,7 @@ function compare(){
  }catch(e){ui.status.textContent=e.message}finally{run.disabled=false}},true);
  ui.body.append(field("Compare current PDF with",choice),file,run,results);
 }
-window.FoxPDFIntegrity={open:type=>type==="compare"?compare():type==="search"?search():type==="move"?moveText():type==="redact"?redact():type==="paragraph"?paragraph():["ocr","compress","convert","protect"].includes(type)?processing(type==="protect"?"encrypt":type):edit(),editSelection:selection=>paragraph(selection),sameSource:same};
+window.FoxPDFIntegrity={version:"1.8",open:type=>type==="compare"?compare():type==="search"?search():type==="move"?moveText():type==="redact"?redact():type==="paragraph"?paragraph():["ocr","compress","convert","protect"].includes(type)?processing(type==="protect"?"encrypt":type):edit(),editSelection:selection=>paragraph(selection),sameSource:same};
 const bar=document.querySelector(".fxie-barleft");if(bar){bar.append(button("Paragraph edit",paragraph),button("Precise text",edit),button("Redact & sanitize",redact),button("PDF tools",()=>processing("ocr")))}
 const convert=document.getElementById("fxieConvert");if(convert)convert.onclick=()=>processing("convert");
 const advanced=document.getElementById("fxieAdvanced");if(advanced)advanced.onclick=()=>processing("ocr");
