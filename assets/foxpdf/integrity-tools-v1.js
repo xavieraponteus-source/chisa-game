@@ -5,9 +5,9 @@ ready(()=>{
 const app=window.FoxPDFBridge;if(!app)return;
 const make=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};
 const css=document.createElement("link");css.rel="stylesheet";css.href="/fox-assets/integrity-tools-v1.css?v=1.3";document.head.append(css);
-let modal=null,lastFocus=null,keyTrap=null;
+let modal=null,lastFocus=null,keyTrap=null,fabState=null;
 const same=(a,b)=>!!a&&!!b&&a.name===b.name&&a.bytes.length===b.bytes.length&&a.bytes.every((v,i)=>v===b.bytes[i]);
-function close(){if(keyTrap)document.removeEventListener("keydown",keyTrap,true);keyTrap=null;modal?.parentElement?.classList.remove("fxi-docked");modal?.remove();modal=null;lastFocus?.focus?.();window.dispatchEvent(new Event("resize"))}
+function close(){if(keyTrap)document.removeEventListener("keydown",keyTrap,true);keyTrap=null;const fab=document.getElementById("chatFab");if(fabState&&fab){if(fabState.value)fab.style.setProperty("display",fabState.value,fabState.priority);else fab.style.removeProperty("display")}fabState=null;modal?.parentElement?.classList.remove("fxi-docked");modal?.remove();modal=null;lastFocus?.focus?.();window.dispatchEvent(new Event("resize"))}
 function button(text,action,primary=false){const e=make("button",text,primary?"fxi-primary":"");e.type="button";e.onclick=action;return e}
 function field(label,control){const e=make("label");e.append(make("span",label),control);return e}
 function select(choices){const e=make("select");for(const [value,label] of choices){const o=make("option",label);o.value=value;e.append(o)}return e}
@@ -18,6 +18,7 @@ function dialog(title){
  const body=make("div",undefined,"fxi-body"),status=make("p","Ready.","fxi-status");status.setAttribute("role","status");status.setAttribute("aria-live","polite");
  const tabs=make("nav",undefined,"fxi-tabs");tabs.setAttribute("aria-label","Editor tools");tabs.append(button("Paragraph",()=>paragraph()),button("Precise",edit),button("Redact",redact),button("More",()=>processing("ocr")));
  box.append(header,tabs,body,status);modal.append(box);const host=document.querySelector(".fxie-layout");if(!host)throw Error("Open the PDF editor first.");host.classList.add("fxi-docked");host.append(modal);
+ const fab=document.getElementById("chatFab");if(fab){fabState={value:fab.style.getPropertyValue("display"),priority:fab.style.getPropertyPriority("display")};fab.style.setProperty("display","none","important")}
  keyTrap=e=>{if(modal&&box.contains(document.activeElement)&&e.key==="Escape"){e.preventDefault();e.stopPropagation();close()}};document.addEventListener("keydown",keyTrap,true);window.dispatchEvent(new Event("resize"));
  header.querySelector("button").focus();return {body,status,box,root:modal};
 }
